@@ -48,7 +48,7 @@ export default function ClassroomBoardPage() {
 
   // Auto-gate teachers to their M365 class group
   useEffect(() => {
-    if (!autoGated && teacherGradeRooms.length === 1 && hasRole('teacher') && !hasRole('admin')) {
+    if (!autoGated && teacherGradeRooms.length === 1 && hasRole('teacher') && !hasRole('dispatcher')) {
       setGradeFilter(teacherGradeRooms[0]);
       setAutoGated(true);
     }

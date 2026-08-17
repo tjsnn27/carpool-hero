@@ -35,7 +35,7 @@ export default function FaqPage() {
 
       <div className="bg-brand-100 border-3 border-brand-700 rounded-2xl p-4 text-sm font-medium text-brand-950">
         Carpool Hero is designed like leading carpool apps: automatic classroom notification when you arrive,
-        without tracking your location. Volunteers with keypad check-in provide a fallback for drivers without smartphones.
+        without tracking your location. Traffic controllers with keypad check-in provide a fallback for drivers without smartphones.
       </div>
 
       <div className="space-y-3">

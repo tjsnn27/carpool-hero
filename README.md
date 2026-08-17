@@ -19,11 +19,11 @@ Mobile-first PWA for Sunday School carpool check-in and dismissal, built for **A
 |-------|------|---------|
 | `/driver-pickup` | Public (family tag) | Hands-free geofence arrival + pickup status |
 | `/faq` | Public | Privacy & how-it-works FAQ |
-| `/lane-scanner` | LaneVolunteer, Admin | Numeric keypad + QR scanner check-in (fallback for non-app drivers) |
-| `/classroom-board` | Teacher, Admin | Live dismissal board with TTS/chime |
-| `/admin-roster` | Admin | Roster search + CSV import + M365 sync |
-| `/admin-tags` | Admin | Placard tag → student mapping |
-| `/admin-pickup-zone` | Admin | Configure geofence for auto-arrival |
+| `/lane-scanner` | Traffic Controller, Dispatcher | Numeric keypad + QR check-in (fallback for non-app drivers) |
+| `/classroom-board` | Teacher, Dispatcher | Live dismissal board with TTS/chime |
+| `/admin-roster` | Dispatcher | Roster search + CSV import + M365 sync |
+| `/admin-tags` | Dispatcher | Placard tag → student mapping |
+| `/admin-pickup-zone` | Dispatcher | Configure geofence for auto-arrival |
 
 ## Driver Auto-Arrival (Beeline-style)
 
@@ -35,7 +35,7 @@ Parents/drivers use **`/driver-pickup`** — no school login required:
 4. Live **children status**: In Class → Walking to Car → Picked Up
 5. One-tap **I've Arrived** fallback if geofence is unavailable
 
-**Volunteer fallback:** Drivers without smartphones use **Check-In** keypad (same queue).
+**Traffic controller fallback:** Drivers without smartphones use **Traffic Control** keypad (same queue).
 
 See **`/faq`** for privacy explanations tailored to parents.
 
@@ -54,14 +54,14 @@ npm run dev
 - **Client:** http://localhost:5174
 - **API:** http://localhost:7071/api
 - **Mock auth:** enabled via `client/.env` (`VITE_MOCK_AUTH=true`)
-- Switch roles using the dropdown in the header (Admin / Teacher / Volunteer)
+- Switch roles using the dropdown in the header (Dispatcher / Teacher / Traffic Controller)
 
 ### Demo flow
 
-1. Open **Check-In** → enter tag `104` → car appears on board
+1. Open **Traffic Control** → enter tag `104` → car appears on board
 2. Open **Board** (switch role to Teacher) → tap **Stage →** on a child
 3. Tap **Dismiss / Loaded** when child reaches the curb
-4. **Admin** → import CSV or view roster
+4. **Dispatcher** → import CSV or view roster
 
 ## Azure Deployment
 
@@ -93,9 +93,9 @@ AAD_CLIENT_SECRET=<secret>
 
 Create app roles in Entra ID matching `staticwebapp.config.json`:
 
-- `admin`
+- `dispatcher`
 - `teacher`
-- `lanevolunteer`
+- `trafficcontroller`
 
 Assign users/groups to roles. SWA reads roles via `/api/GetRoles`.
 
@@ -123,12 +123,12 @@ SWA GitHub Action or `swa deploy` with:
 - `/classroom-board` auto-filters to the teacher's class group (e.g. `Class-K-1` → `K-1`)
 - In mock mode, switch role to **Teacher** to see auto-gating to `K-1`
 
-### M365 Roster Sync (Admin)
-- **Admin → Roster → Sync from Microsoft 365** triggers `GET /api/m365/sync-roster`
+### M365 Roster Sync (Dispatcher)
+- **Dispatcher → Roster → Sync from Microsoft 365** triggers `GET /api/m365/sync-roster`
 - Backend queries Entra groups matching `Class-*`, `Grade-*`, `SundaySchool-*`
 - Upserts student records with `m365_user_id`, `m365_group_id`, and `grade_room`
 
-### Placard Tag Mapping (Admin)
+### Placard Tag Mapping (Dispatcher)
 - **`/admin-tags`** — map 2–4 digit placard numbers to M365 student records (siblings)
 - Set authorized pickup names and safety/allergy notes per family
 
@@ -138,7 +138,7 @@ SWA GitHub Action or `swa deploy` with:
 |------------|------|---------|
 | `User.Read` | Delegated | Teacher SSO |
 | `GroupMember.Read.All` | Delegated | Teacher class auto-gate |
-| `Group.Read.All` | Application | Admin roster sync |
+| `Group.Read.All` | Application | Dispatcher roster sync |
 | `User.Read.All` | Application | Fetch group members |
 
 Configure application settings:

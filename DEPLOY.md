@@ -53,7 +53,7 @@ Send them the Render URL. Suggested demo script:
 
 1. **Driver** tab → enter tag `104` → tap **I've Arrived**
 2. **Board** tab (switch mock role to Teacher) → see Emma & Olivia queued
-3. **Check-In** tab (Volunteer role) → manual keypad fallback
+3. **Traffic Control** tab (Traffic Controller role) → manual keypad fallback
 4. **FAQ** tab → privacy explanations
 
 Mock auth is enabled — use the **Role** dropdown in the header to switch views.
@@ -64,7 +64,7 @@ Mock auth is enabled — use the **Role** dropdown in the header to switch views
 
 - **Free tier sleeps** after 15 min idle — first visit may take ~30 sec to wake up
 - **Geolocation** (Driver auto-arrival) requires HTTPS — Render provides this automatically
-- **Admin → Zone → Use My Current Location** to test geofence at your demo site
+- **Dispatcher → Zone → Use My Current Location** to test geofence at your demo site
 - Data resets when the service restarts (in-memory mock DB)
 
 ---

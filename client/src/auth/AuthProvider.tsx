@@ -3,17 +3,25 @@ import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { isMockAuth, loginRequest, graphScopes, msalConfig } from './msalConfig';
 import { api } from '../lib/api';
-import type { AppRole } from '../types';
+import type { AppRole, StaffRole } from '../types';
+
+function hasStaffRole(active: AppRole, required: StaffRole): boolean {
+  return active === 'dispatcher' || active === required;
+}
+
+function hasAnyStaffRole(activeRoles: AppRole[], required: StaffRole): boolean {
+  return activeRoles.includes('dispatcher') || activeRoles.includes(required);
+}
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
 interface AuthContextValue {
   roles: AppRole[];
-  mockRole: AppRole;
+  mockRole: StaffRole;
   teacherGradeRooms: string[];
-  hasRole: (role: AppRole) => boolean;
+  hasRole: (role: StaffRole | 'driver') => boolean;
   mockAuth: boolean;
-  setMockRole: (role: AppRole) => void;
+  setMockRole: (role: StaffRole) => void;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -22,15 +30,14 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const MOCK_TEACHER_GRADES: Record<AppRole, string[]> = {
-  admin: [],
+const MOCK_TEACHER_GRADES: Record<StaffRole, string[]> = {
+  dispatcher: [],
   teacher: ['K-1'],
-  lanevolunteer: [],
-  driver: [],
+  trafficcontroller: [],
 };
 
 function MockAuthProvider({ children }: { children: ReactNode }) {
-  const [mockRole, setMockRole] = useState<AppRole>('admin');
+  const [mockRole, setMockRole] = useState<StaffRole>('dispatcher');
   const roles: AppRole[] = [mockRole];
 
   return (
@@ -39,7 +46,7 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
         roles,
         mockRole,
         teacherGradeRooms: MOCK_TEACHER_GRADES[mockRole],
-        hasRole: (r) => mockRole === 'admin' || mockRole === r,
+        hasRole: (r) => r === 'driver' || hasStaffRole(mockRole, r as StaffRole),
         mockAuth: true,
         setMockRole,
         login: async () => {},
@@ -92,9 +99,11 @@ function MsalAuthInner({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         roles,
-        mockRole: 'admin',
+        mockRole: 'dispatcher',
         teacherGradeRooms,
-        hasRole: (r) => roles.includes('admin') || roles.includes(r),
+        hasRole: (r) =>
+          r === 'driver' ||
+          roles.some((active) => hasAnyStaffRole([active], r as StaffRole)),
         mockAuth: false,
         setMockRole: () => {},
         login: async () => {

@@ -1,9 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import type { AppRole } from '../types';
+import type { StaffRole } from '../types';
 import type { ReactNode } from 'react';
 
-export function RoleGate({ roles, children }: { roles: AppRole[]; children: ReactNode }) {
+export function RoleGate({ roles, children }: { roles: StaffRole[]; children: ReactNode }) {
   const { hasRole, isAuthenticated, mockAuth, login } = useAuth();
 
   if (!isAuthenticated && !mockAuth) {

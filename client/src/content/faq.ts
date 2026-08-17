@@ -7,7 +7,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'How does Carpool Hero work?',
     answer:
-      'When your phone detects you have entered the school pickup zone, Carpool Hero automatically notifies the classroom so your child can walk to the car. Volunteers at the curb also see your arrival on the loading dock screen.',
+      'When your phone detects you have entered the school pickup zone, Carpool Hero automatically notifies the classroom so your child can walk to the car. Traffic controllers at the curb also see your arrival on the loading dock screen.',
   },
   {
     question: 'How does Carpool Hero know I\'m in line?',
@@ -37,7 +37,7 @@ export const FAQ: FaqItem[] = [
   {
     question: 'What if I don\'t have a smartphone?',
     answer:
-      'Drivers without the app can still pick up children. A volunteer at the curb will enter your placard number on the Lane Check-In keypad. Wait times may be slightly longer, but dismissal works the same way.',
+      'Drivers without the app can still pick up children. A traffic controller at the curb will enter your placard number on the Traffic Control keypad. Wait times may be slightly longer, but dismissal works the same way.',
   },
   {
     question: 'Can other drivers pick up my kids?',

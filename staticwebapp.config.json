@@ -18,43 +18,43 @@
     },
     {
       "route": "/admin-pickup-zone",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["dispatcher"]
     },
     {
       "route": "/admin-pickup-zone/*",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["dispatcher"]
     },
     {
       "route": "/admin-tags",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["dispatcher"]
     },
     {
       "route": "/admin-tags/*",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["dispatcher"]
     },
     {
       "route": "/admin-roster",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["dispatcher"]
     },
     {
       "route": "/admin-roster/*",
-      "allowedRoles": ["admin"]
+      "allowedRoles": ["dispatcher"]
     },
     {
       "route": "/classroom-board",
-      "allowedRoles": ["admin", "teacher"]
+      "allowedRoles": ["dispatcher", "teacher"]
     },
     {
       "route": "/classroom-board/*",
-      "allowedRoles": ["admin", "teacher"]
+      "allowedRoles": ["dispatcher", "teacher"]
     },
     {
       "route": "/lane-scanner",
-      "allowedRoles": ["admin", "lanevolunteer"]
+      "allowedRoles": ["dispatcher", "trafficcontroller"]
     },
     {
       "route": "/lane-scanner/*",
-      "allowedRoles": ["admin", "lanevolunteer"]
+      "allowedRoles": ["dispatcher", "trafficcontroller"]
     },
     {
       "route": "/api/*",

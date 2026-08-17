@@ -1,6 +1,14 @@
 export type StudentStatus = 'in_class' | 'staged' | 'loaded' | 'absent';
 export type QueueStatus = 'waiting' | 'calling' | 'staged' | 'loaded' | 'cancelled';
-export type AppRole = 'admin' | 'teacher' | 'lanevolunteer' | 'driver';
+/** Staff roles (Beeline-aligned). Driver is optional public access — no sign-in. */
+export type StaffRole = 'dispatcher' | 'teacher' | 'trafficcontroller';
+export type AppRole = StaffRole | 'driver';
+
+export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  dispatcher: 'Dispatcher',
+  teacher: 'Teacher',
+  trafficcontroller: 'Traffic Controller',
+};
 export type ArrivalSource = 'geofence' | 'beacon' | 'manual' | 'volunteer';
 
 export interface PickupZone {
