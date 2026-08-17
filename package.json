@@ -1,0 +1,21 @@
+{
+  "name": "carpool-hero",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Agasthiyar Academy — Sunday School carpool PWA for Azure Static Web Apps",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:client\"",
+    "dev:api": "npm run dev --prefix api",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client && npm run build --prefix api",
+    "build:demo": "npm install --prefix api && npm install --prefix client && npm run build --prefix client",
+    "start": "npm run start --prefix api",
+    "start:api": "npm run start --prefix api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

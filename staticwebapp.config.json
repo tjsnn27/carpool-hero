@@ -1,0 +1,88 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/*.{css,js,png,jpg,svg,ico,woff2}"]
+  },
+  "routes": [
+    {
+      "route": "/driver-pickup",
+      "allowedRoles": ["anonymous", "authenticated", "driver"]
+    },
+    {
+      "route": "/driver-pickup/*",
+      "allowedRoles": ["anonymous", "authenticated", "driver"]
+    },
+    {
+      "route": "/faq",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/admin-pickup-zone",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-pickup-zone/*",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-tags",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-tags/*",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-roster",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-roster/*",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/classroom-board",
+      "allowedRoles": ["admin", "teacher"]
+    },
+    {
+      "route": "/classroom-board/*",
+      "allowedRoles": ["admin", "teacher"]
+    },
+    {
+      "route": "/lane-scanner",
+      "allowedRoles": ["admin", "lanevolunteer"]
+    },
+    {
+      "route": "/lane-scanner/*",
+      "allowedRoles": ["admin", "lanevolunteer"]
+    },
+    {
+      "route": "/api/*",
+      "allowedRoles": ["anonymous", "authenticated"]
+    }
+  ],
+  "auth": {
+    "rolesSource": "/api/GetRoles",
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/{tenantId}/v2.0",
+          "clientIdSettingName": "AAD_CLIENT_ID",
+          "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": ["scope=openid profile email"]
+        }
+      }
+    }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  },
+  "mimeTypes": {
+    ".json": "application/json",
+    ".webmanifest": "application/manifest+json"
+  }
+}

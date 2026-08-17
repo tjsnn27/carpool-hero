@@ -1,0 +1,35 @@
+{
+  "name": "carpool-hero-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions API for Carpool Hero",
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf dist",
+    "start": "tsx src/devServer.ts",
+    "start:functions": "npm run build && func start",
+    "dev": "tsx src/devServer.ts"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.6.0",
+    "@azure/identity": "^4.5.0",
+    "@azure/web-pubsub": "^1.1.3",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "azure-functions-core-tools": "^4.0.6821",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}
