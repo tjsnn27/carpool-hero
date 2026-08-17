@@ -4,11 +4,9 @@ services:
     runtime: node
     plan: free
     buildCommand: npm run build:demo
-    startCommand: npm start
+    startCommand: NODE_ENV=production npm start
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: MOCK_MODE
         value: true
       - key: NODE_VERSION
