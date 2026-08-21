@@ -5,18 +5,6 @@
   },
   "routes": [
     {
-      "route": "/driver-pickup",
-      "allowedRoles": ["anonymous", "authenticated", "driver"]
-    },
-    {
-      "route": "/driver-pickup/*",
-      "allowedRoles": ["anonymous", "authenticated", "driver"]
-    },
-    {
-      "route": "/faq",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
       "route": "/admin-pickup-zone",
       "allowedRoles": ["dispatcher"]
     },

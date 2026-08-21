@@ -70,15 +70,6 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(zone),
     }),
-
-  getFamilyStatus: (tagNumber: string) =>
-    request<import('../types').FamilyPickupStatus>(`/families/${tagNumber}/status`),
-
-  arrive: (tag_number: string, source: import('../types').ArrivalSource = 'manual', lane_number = 1) =>
-    request<import('../types').QueueItem & { arrival_source: string }>('/queue/arrive', {
-      method: 'POST',
-      body: JSON.stringify({ tag_number, source, lane_number }),
-    }),
 };
 
 export type { RealtimeMessage };

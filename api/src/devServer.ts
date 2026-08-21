@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { db } from './lib/db';
 import { publish, negotiate } from './lib/pubsub';
-import { parseCsv } from './lib/csvParser';
+import { parseCsv, lastNameFromFamily } from './lib/csvParser';
 import { subscribe, mockStore } from './lib/mockStore';
 import { isMockMode } from './lib/types';
 

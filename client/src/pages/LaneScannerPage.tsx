@@ -91,7 +91,7 @@ export default function LaneScannerPage() {
   return (
     <div className="max-w-md mx-auto space-y-4 pb-8">
       <div className="bg-stone-100 border-2 border-stone-400 rounded-xl px-4 py-3 text-sm font-bold text-stone-700">
-        No smartphone? Traffic controllers enter placard numbers here as a fallback — same queue, slightly longer wait.
+        No smartphone? Traffic controllers enter placard numbers here — same queue as automated check-in.
       </div>
 
       <div className="flex items-center justify-between">

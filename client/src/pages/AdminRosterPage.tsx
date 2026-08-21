@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CloudDownload, Search, Upload, Users } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../auth/AuthProvider';
 import type { RosterData, RosterStudent } from '../types';
 
 export default function AdminRosterPage() {
+  const { refreshRosterGrades } = useAuth();
   const [roster, setRoster] = useState<RosterData | null>(null);
   const [search, setSearch] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -52,6 +54,7 @@ export default function AdminRosterPage() {
       const r = await api.importCsv(csv);
       setResult(`Imported ${r.rowsProcessed} rows — ${r.familiesCreated} families, ${r.studentsCreated} new students, ${r.studentsUpdated} updated.`);
       await load();
+      await refreshRosterGrades();
     } catch (err) {
       setResult(err instanceof Error ? err.message : 'Import failed');
     } finally {
@@ -59,9 +62,10 @@ export default function AdminRosterPage() {
     }
   };
 
-  const sample = `TagNumber,FamilyName,StudentFirstName,StudentLastName,GradeRoom,Phone,Notes
-104,Smith Family,Emma,Smith,K-1,555-0104,
-205,Johnson Family,Liam,Johnson,3rd-4th,555-0205,Custody: mother only pickup`;
+  const sample = `TagNumber,StudentFirstName,FamilyName,GradeRoom
+104,Emma,Smith Family,Grade 1
+205,Liam,Johnson Family,Grade 2
+312,Sophia,Williams Family,Grade 1`;
 
   return (
     <div className="space-y-6 pb-8">
@@ -86,7 +90,7 @@ export default function AdminRosterPage() {
       <div className="bg-white rounded-2xl border-4 border-stone-900 p-5 shadow-[3px_3px_0_#1c1917]">
         <h2 className="font-black text-lg mb-3 flex items-center gap-2"><Upload size={20} /> CSV Import</h2>
         <p className="text-sm text-stone-600 mb-3 font-medium">
-          Columns: TagNumber, FamilyName, StudentFirstName, StudentLastName, GradeRoom, Phone, Notes
+          Required columns only: TagNumber, StudentFirstName, FamilyName, GradeRoom (comma or tab separated)
         </p>
         <div
           className="border-3 border-dashed border-stone-400 rounded-xl p-8 text-center cursor-pointer hover:border-brand-600 mb-3"

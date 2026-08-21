@@ -39,20 +39,23 @@ const statusStyle: Record<string, string> = {
 
 export default function ClassroomBoardPage() {
   const { queue, connected, applyMessage } = useRealtime();
-  const { teacherGradeRooms, hasRole } = useAuth();
+  const { teacherGradeRooms, activeTeacherGrade, hasRole } = useAuth();
   const [gradeFilter, setGradeFilter] = useState('');
-  const [autoGated, setAutoGated] = useState(false);
   const [tts, setTts] = useState(false);
   const [chime, setChime] = useState(true);
   const prevIds = useRef<Set<string>>(new Set());
 
-  // Auto-gate teachers to their M365 class group
+  const teacherLocked = !!activeTeacherGrade;
+
   useEffect(() => {
-    if (!autoGated && teacherGradeRooms.length === 1 && hasRole('teacher') && !hasRole('dispatcher')) {
-      setGradeFilter(teacherGradeRooms[0]);
-      setAutoGated(true);
+    if (activeTeacherGrade) {
+      setGradeFilter(activeTeacherGrade);
+      return;
     }
-  }, [teacherGradeRooms, autoGated, hasRole]);
+    if (teacherGradeRooms.length === 1 && hasRole('teacher') && !hasRole('dispatcher')) {
+      setGradeFilter(teacherGradeRooms[0]);
+    }
+  }, [activeTeacherGrade, teacherGradeRooms, hasRole]);
 
   const grades = useMemo(() => {
     const set = new Set<string>();
@@ -99,7 +102,10 @@ export default function ClassroomBoardPage() {
           <p className={`text-sm font-bold ${connected ? 'text-green-700' : 'text-red-600'}`}>
             {connected ? '● Live updates' : '○ Reconnecting…'}
           </p>
-          {teacherGradeRooms.length > 0 && (
+          {activeTeacherGrade && (
+            <p className="text-xs font-bold text-brand-700 mt-1">Viewing: {activeTeacherGrade}</p>
+          )}
+          {!activeTeacherGrade && teacherGradeRooms.length > 0 && (
             <p className="text-xs font-bold text-brand-700 mt-1">
               Your class{teacherGradeRooms.length > 1 ? 'es' : ''}: {teacherGradeRooms.join(', ')}
             </p>
@@ -109,11 +115,12 @@ export default function ClassroomBoardPage() {
           <select
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
-            className="border-2 border-stone-900 rounded-xl px-4 py-2 font-bold bg-white"
+            disabled={teacherLocked}
+            className="border-2 border-stone-900 rounded-xl px-4 py-2 font-bold bg-white disabled:opacity-70"
             aria-label="Filter by grade"
           >
-            <option value="">All Grades</option>
-            {grades.map((g) => (
+            {!teacherLocked && <option value="">All Grades</option>}
+            {(teacherLocked ? [activeTeacherGrade!] : grades).map((g) => (
               <option key={g} value={g}>{g}</option>
             ))}
           </select>

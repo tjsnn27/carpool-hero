@@ -1,14 +1,37 @@
 export type StudentStatus = 'in_class' | 'staged' | 'loaded' | 'absent';
 export type QueueStatus = 'waiting' | 'calling' | 'staged' | 'loaded' | 'cancelled';
-/** Staff roles (Beeline-aligned). Driver is optional public access — no sign-in. */
+/** Staff roles (Beeline-aligned). */
 export type StaffRole = 'dispatcher' | 'teacher' | 'trafficcontroller';
-export type AppRole = StaffRole | 'driver';
+export type AppRole = StaffRole;
 
 export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   dispatcher: 'Dispatcher',
   teacher: 'Teacher',
   trafficcontroller: 'Traffic Controller',
 };
+
+export const TEACHER_PERSONA_PREFIX = 'teacher:';
+
+export function teacherPersonaValue(gradeRoom: string): string {
+  return `${TEACHER_PERSONA_PREFIX}${gradeRoom}`;
+}
+
+export function parseMockPersona(value: string): { role: StaffRole; teacherGrade: string | null } {
+  if (value.startsWith(TEACHER_PERSONA_PREFIX)) {
+    return {
+      role: 'teacher',
+      teacherGrade: value.slice(TEACHER_PERSONA_PREFIX.length),
+    };
+  }
+  return { role: value as StaffRole, teacherGrade: null };
+}
+
+export function mockPersonaLabel(value: string, gradeRooms: string[]): string {
+  const { role, teacherGrade } = parseMockPersona(value);
+  if (role === 'teacher' && teacherGrade) return `Teacher ${teacherGrade}`;
+  if (role === 'teacher' && gradeRooms.length === 0) return 'Teacher';
+  return STAFF_ROLE_LABELS[role] ?? value;
+}
 export type ArrivalSource = 'geofence' | 'beacon' | 'manual' | 'volunteer';
 
 export interface PickupZone {

@@ -15,6 +15,7 @@ import type {
   UpsertTagPayload,
 } from './types';
 import { today } from './types';
+import { lastNameFromFamily } from './csvParser';
 
 const bus = new EventEmitter();
 bus.setMaxListeners(100);
@@ -81,10 +82,10 @@ function seedIfEmpty() {
   ];
 
   students = [
-    makeStudent({ family_id: smithId, m365_user_id: 'm365-emma', m365_group_id: 'mock-group-k1', first_name: 'Emma', last_name: 'Smith', grade_room: 'K-1' }),
-    makeStudent({ family_id: smithId, m365_user_id: 'm365-olivia', m365_group_id: 'mock-group-k1', first_name: 'Olivia', last_name: 'Brown', grade_room: 'K-1' }),
-    makeStudent({ family_id: johnsonId, m365_user_id: 'm365-liam', m365_group_id: 'mock-group-34', first_name: 'Liam', last_name: 'Johnson', grade_room: '3rd-4th' }),
-    makeStudent({ family_id: williamsId, m365_user_id: 'm365-sophia', m365_group_id: 'mock-group-k1', first_name: 'Sophia', last_name: 'Williams', grade_room: 'K-1' }),
+    makeStudent({ family_id: smithId, m365_user_id: 'm365-emma', m365_group_id: 'mock-group-g1', first_name: 'Emma', last_name: 'Smith', grade_room: 'Grade 1' }),
+    makeStudent({ family_id: smithId, m365_user_id: 'm365-olivia', m365_group_id: 'mock-group-g1', first_name: 'Olivia', last_name: 'Brown', grade_room: 'Grade 1' }),
+    makeStudent({ family_id: johnsonId, m365_user_id: 'm365-liam', m365_group_id: 'mock-group-g2', first_name: 'Liam', last_name: 'Johnson', grade_room: 'Grade 2' }),
+    makeStudent({ family_id: williamsId, m365_user_id: 'm365-sophia', m365_group_id: 'mock-group-g1', first_name: 'Sophia', last_name: 'Williams', grade_room: 'Grade 1' }),
   ];
 }
 
@@ -332,21 +333,17 @@ export const mockStore = {
           id: randomUUID(),
           tag_number: tag,
           family_name: row.family_name.trim(),
-          primary_phone: row.phone?.trim() || null,
-          authorized_pickups: row.authorized_pickups
-            ? row.authorized_pickups.split(';').map((s) => s.trim()).filter(Boolean)
-            : [],
-          safety_notes: row.notes?.trim() || '',
+          primary_phone: null,
+          authorized_pickups: [],
+          safety_notes: '',
         };
         families.push(family);
         familiesCreated++;
       } else {
         family.family_name = row.family_name.trim();
-        if (row.phone) family.primary_phone = row.phone.trim();
-        if (row.notes) family.safety_notes = row.notes.trim();
       }
 
-      const lastName = row.student_last_name?.trim() || row.family_name.split(/\s+/)[0];
+      const lastName = lastNameFromFamily(row.family_name);
       const student = students.find(
         (s) =>
           s.family_id === family!.id &&

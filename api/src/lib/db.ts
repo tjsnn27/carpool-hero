@@ -3,6 +3,7 @@ import type { QueueItem, QueueStatus, RosterImportRow, Student, TagRecord, Upser
 import { isMockMode, today } from './types';
 import { mockStore } from './mockStore';
 import { fetchClassGroups } from './graph';
+import { lastNameFromFamily } from './csvParser';
 
 let pool: Pool | null = null;
 
@@ -315,23 +316,17 @@ export const db = {
         const tag = row.tag_number.trim();
         if (!tag || !row.family_name || !row.student_first_name || !row.grade_room) continue;
 
-        const pickups = row.authorized_pickups
-          ? row.authorized_pickups.split(';').map((s) => s.trim()).filter(Boolean)
-          : [];
-
         const familyResult = await client.query(
           `INSERT INTO families (tag_number, family_name, primary_phone, safety_notes, authorized_pickups)
-           VALUES ($1, $2, $3, $4, $5)
+           VALUES ($1, $2, NULL, '', '{}')
            ON CONFLICT (tag_number) DO UPDATE SET
-             family_name = EXCLUDED.family_name,
-             primary_phone = COALESCE(EXCLUDED.primary_phone, families.primary_phone),
-             safety_notes = COALESCE(EXCLUDED.safety_notes, families.safety_notes)
+             family_name = EXCLUDED.family_name
            RETURNING id, (xmax = 0) AS inserted`,
-          [tag, row.family_name.trim(), row.phone?.trim() || null, row.notes?.trim() || '', pickups]
+          [tag, row.family_name.trim()]
         );
         if (familyResult.rows[0].inserted) familiesCreated++;
         const familyId = familyResult.rows[0].id;
-        const lastName = row.student_last_name?.trim() || row.family_name.split(/\s+/)[0];
+        const lastName = lastNameFromFamily(row.family_name);
 
         const studentResult = await client.query(
           `INSERT INTO students (family_id, first_name, last_name, grade_room)

@@ -172,7 +172,9 @@ MOCK_MODE=false
 ## CSV Format
 
 ```csv
-TagNumber,FamilyName,StudentFirstName,StudentLastName,GradeRoom,Phone,Notes
-104,Smith Family,Emma,Smith,K-1,555-0104,
-205,Johnson Family,Liam,Johnson,3rd-4th,555-0205,Custody: mother only pickup
+TagNumber,StudentFirstName,FamilyName,GradeRoom
+104,Emma,Smith Family,K-1
+205,Liam,Johnson Family,3rd-4th
 ```
+
+Tab-separated files with the same four columns are also accepted. Last name is derived from the family name (e.g. Smith Family → Smith). Phone, notes, and authorized pickups are configured separately under **Tags**.

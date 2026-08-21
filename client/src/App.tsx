@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { Car, ClipboardList, HelpCircle, MapPin, Shield, Smartphone, Tag, Wifi, WifiOff } from 'lucide-react';
+import { Car, ClipboardList, MapPin, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from './auth/AuthProvider';
 import { RoleGate } from './components/RoleGate';
 import { useRealtime } from './hooks/useRealtime';
@@ -8,25 +8,31 @@ import ClassroomBoardPage from './pages/ClassroomBoardPage';
 import AdminRosterPage from './pages/AdminRosterPage';
 import AdminTagsPage from './pages/AdminTagsPage';
 import AdminPickupZonePage from './pages/AdminPickupZonePage';
-import DriverPickupPage from './pages/DriverPickupPage';
-import FaqPage from './pages/FaqPage';
 import type { StaffRole } from './types';
-import { STAFF_ROLE_LABELS } from './types';
+import { STAFF_ROLE_LABELS, teacherPersonaValue } from './types';
 
-const STAFF_ROLES: StaffRole[] = ['dispatcher', 'teacher', 'trafficcontroller'];
-
-const nav: { to: string; label: string; icon: typeof Car; roles?: StaffRole[]; public?: boolean }[] = [
-  { to: '/driver-pickup', label: 'Driver', icon: Smartphone, public: true },
+const nav: { to: string; label: string; icon: typeof Car; roles?: StaffRole[] }[] = [
   { to: '/lane-scanner', label: 'Traffic Control', icon: Car, roles: ['trafficcontroller', 'dispatcher'] },
   { to: '/classroom-board', label: 'Board', icon: ClipboardList, roles: ['teacher', 'dispatcher'] },
   { to: '/admin-roster', label: 'Roster', icon: Shield, roles: ['dispatcher'] },
   { to: '/admin-tags', label: 'Tags', icon: Tag, roles: ['dispatcher'] },
   { to: '/admin-pickup-zone', label: 'Zone', icon: MapPin, roles: ['dispatcher'] },
-  { to: '/faq', label: 'FAQ', icon: HelpCircle, public: true },
 ];
 
+function HomeRedirect() {
+  const { hasRole } = useAuth();
+  if (hasRole('trafficcontroller') && !hasRole('dispatcher')) {
+    return <Navigate to="/lane-scanner" replace />;
+  }
+  if (hasRole('teacher') && !hasRole('dispatcher')) {
+    return <Navigate to="/classroom-board" replace />;
+  }
+  return <Navigate to="/classroom-board" replace />;
+}
+
 export default function App() {
-  const { mockAuth, setMockRole, mockRole, hasRole, login, logout, isAuthenticated } = useAuth();
+  const { mockAuth, setMockPersona, mockPersona, rosterGradeRooms, hasRole, login, logout, isAuthenticated } =
+    useAuth();
   const { connected, mockMode } = useRealtime();
 
   return (
@@ -45,14 +51,17 @@ export default function App() {
             <span className="text-xs font-bold hidden sm:inline">{mockMode ? 'Mock' : 'Live'}</span>
             {mockAuth ? (
               <select
-                value={mockRole}
-                onChange={(e) => setMockRole(e.target.value as StaffRole)}
-                className="text-xs bg-brand-800 border border-brand-500 rounded-lg px-2 py-1 text-white"
-                aria-label="Mock role"
+                value={mockPersona}
+                onChange={(e) => setMockPersona(e.target.value)}
+                className="text-xs bg-brand-800 border border-brand-500 rounded-lg px-2 py-1 text-white max-w-[11rem]"
+                aria-label="View as"
               >
-                <option value="" disabled>Role…</option>
-                {STAFF_ROLES.map((role) => (
-                  <option key={role} value={role}>{STAFF_ROLE_LABELS[role]}</option>
+                <option value="dispatcher">{STAFF_ROLE_LABELS.dispatcher}</option>
+                <option value="trafficcontroller">{STAFF_ROLE_LABELS.trafficcontroller}</option>
+                {rosterGradeRooms.map((grade) => (
+                  <option key={grade} value={teacherPersonaValue(grade)}>
+                    Teacher {grade}
+                  </option>
                 ))}
               </select>
             ) : !isAuthenticated ? (
@@ -70,7 +79,7 @@ export default function App() {
 
       <nav className="bg-white border-b-4 border-stone-900 px-2 py-1 flex gap-1 overflow-x-auto sticky top-[4.5rem] z-40">
         {nav
-          .filter((n) => n.public || (n.roles && n.roles.some((r) => hasRole(r))))
+          .filter((n) => n.roles && n.roles.some((r) => hasRole(r)))
           .map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -91,9 +100,9 @@ export default function App() {
 
       <main className="flex-1 p-4 max-w-6xl mx-auto w-full">
         <Routes>
-          <Route path="/" element={<Navigate to="/driver-pickup" replace />} />
-          <Route path="/driver-pickup" element={<DriverPickupPage />} />
-          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/driver-pickup" element={<Navigate to="/" replace />} />
+          <Route path="/faq" element={<Navigate to="/" replace />} />
           <Route
             path="/lane-scanner"
             element={

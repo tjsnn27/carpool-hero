@@ -72,11 +72,7 @@ export interface RosterImportRow {
   tag_number: string;
   family_name: string;
   student_first_name: string;
-  student_last_name: string;
   grade_room: string;
-  phone?: string;
-  notes?: string;
-  authorized_pickups?: string;
 }
 
 export interface UpsertTagPayload {
