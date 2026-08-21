@@ -12,6 +12,13 @@ export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
 
 export const TEACHER_PERSONA_PREFIX = 'teacher:';
 
+/** Placard tags: 1–5 digits */
+export const TAG_NUMBER_MAX_LENGTH = 5;
+
+export function sanitizeTagNumberInput(raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, TAG_NUMBER_MAX_LENGTH);
+}
+
 export function teacherPersonaValue(gradeRoom: string): string {
   return `${TEACHER_PERSONA_PREFIX}${gradeRoom}`;
 }

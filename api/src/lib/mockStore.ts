@@ -16,6 +16,7 @@ import type {
 } from './types';
 import { today } from './types';
 import { lastNameFromFamily } from './csvParser';
+import { assertValidTagNumber } from './tagNumber';
 
 const bus = new EventEmitter();
 bus.setMaxListeners(100);
@@ -164,6 +165,7 @@ export const mockStore = {
 
   upsertTag(payload: UpsertTagPayload): TagRecord {
     seedIfEmpty();
+    payload = { ...payload, tag_number: assertValidTagNumber(payload.tag_number) };
     let family = families.find((f) => f.tag_number === payload.tag_number);
     if (!family) {
       family = {
@@ -233,9 +235,10 @@ export const mockStore = {
   },
 
   checkIn(tagNumber: string, laneNumber = 1): QueueItem {
+    tagNumber = assertValidTagNumber(tagNumber);
     seedIfEmpty();
     const family = families.find((f) => f.tag_number === tagNumber);
-    if (!family) throw new Error(`No family found for tag #${tagNumber}`);
+    if (!family) throw new Error(`No family found for Student ID ${tagNumber}`);
 
     const sessionDate = today();
     const existing = queue.find(
@@ -246,12 +249,6 @@ export const mockStore = {
         q.status !== 'cancelled'
     );
     if (existing) return existing;
-
-    students
-      .filter((s) => s.family_id === family.id && s.status === 'in_class')
-      .forEach((s) => {
-        s.status = 'staged';
-      });
 
     const item = buildQueueItem(family, laneNumber);
     queue.push(item);
@@ -305,6 +302,9 @@ export const mockStore = {
     seedIfEmpty();
     const student = students.find((s) => s.id === studentId);
     if (!student) throw new Error('Student not found');
+    if (student.status !== 'in_class') {
+      throw new Error('Student is not in class');
+    }
     student.status = 'staged';
 
     const item = queue.find(
@@ -317,6 +317,31 @@ export const mockStore = {
     return item ?? null;
   },
 
+  loadStudent(studentId: string): QueueItem | null {
+    seedIfEmpty();
+    const student = students.find((s) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    if (student.status !== 'staged') {
+      throw new Error('Student must be released from class before loading');
+    }
+    student.status = 'loaded';
+
+    const item = queue.find(
+      (q) => q.family_id === student.family_id && q.status !== 'loaded' && q.status !== 'cancelled'
+    );
+    if (!item) return null;
+
+    const familyStudents = students.filter((s) => s.family_id === item.family_id);
+    item.students = familyStudents.map((s) => ({ ...s }));
+
+    const activeStudents = familyStudents.filter((s) => s.status !== 'absent');
+    if (activeStudents.length > 0 && activeStudents.every((s) => s.status === 'loaded')) {
+      item.status = 'loaded';
+      item.dismissed_at = new Date().toISOString();
+    }
+    return item;
+  },
+
   importRoster(rows: RosterImportRow[]) {
     seedIfEmpty();
     let familiesCreated = 0;
@@ -324,8 +349,13 @@ export const mockStore = {
     let studentsUpdated = 0;
 
     for (const row of rows) {
-      const tag = row.tag_number.trim();
-      if (!tag || !row.family_name || !row.student_first_name || !row.grade_room) continue;
+      let tag: string;
+      try {
+        tag = assertValidTagNumber(row.tag_number);
+      } catch {
+        continue;
+      }
+      if (!row.family_name || !row.student_first_name || !row.grade_room) continue;
 
       let family = families.find((f) => f.tag_number === tag);
       if (!family) {
@@ -382,7 +412,7 @@ export const mockStore = {
   getFamilyPickupStatus(tagNumber: string): FamilyPickupStatus {
     seedIfEmpty();
     const family = families.find((f) => f.tag_number === tagNumber);
-    if (!family) throw new Error(`No family found for tag #${tagNumber}`);
+    if (!family) throw new Error(`No family found for Student ID ${tagNumber}`);
 
     const sessionDate = today();
     const active = queue.find(

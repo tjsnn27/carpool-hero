@@ -129,7 +129,7 @@ SWA GitHub Action or `swa deploy` with:
 - Upserts student records with `m365_user_id`, `m365_group_id`, and `grade_room`
 
 ### Placard Tag Mapping (Dispatcher)
-- **`/admin-tags`** — map 2–4 digit placard numbers to M365 student records (siblings)
+- **`/admin-tags`** — map 1–5 digit placard numbers to student records (siblings)
 - Set authorized pickup names and safety/allergy notes per family
 
 ### Azure App Registration Requirements

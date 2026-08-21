@@ -1,6 +1,7 @@
 import type { RosterImportRow } from './types';
+import { assertValidTagNumber, isValidTagNumber } from './tagNumber';
 
-/** Required CSV columns (case/spacing insensitive): TagNumber, StudentFirstName, FamilyName, GradeRoom */
+/** Required CSV columns: StudentID, StudentFirstName, FamilyName, GradeRoom */
 const REQUIRED_COLUMNS: (keyof RosterImportRow)[] = [
   'tag_number',
   'student_first_name',
@@ -11,6 +12,8 @@ const REQUIRED_COLUMNS: (keyof RosterImportRow)[] = [
 const COLUMN_ALIASES: Record<string, keyof RosterImportRow> = {
   tag_number: 'tag_number',
   tagnumber: 'tag_number',
+  student_id: 'tag_number',
+  studentid: 'tag_number',
   student_first_name: 'student_first_name',
   studentfirstname: 'student_first_name',
   student_first: 'student_first_name',
@@ -89,13 +92,13 @@ export function parseCsv(text: string): RosterImportRow[] {
   const missing = REQUIRED_COLUMNS.filter((col) => !columnIndex.has(col));
   if (missing.length > 0) {
     const labels: Record<keyof RosterImportRow, string> = {
-      tag_number: 'TagNumber',
+      tag_number: 'StudentID',
       student_first_name: 'StudentFirstName',
       family_name: 'FamilyName',
       grade_room: 'GradeRoom',
     };
     throw new CsvParseError(
-      `CSV must include columns: TagNumber, StudentFirstName, FamilyName, GradeRoom. Missing: ${missing.map((m) => labels[m]).join(', ')}`
+      `CSV must include columns: StudentID, StudentFirstName, FamilyName, GradeRoom. Missing: ${missing.map((m) => labels[m]).join(', ')}`
     );
   }
 
@@ -116,7 +119,12 @@ export function parseCsv(text: string): RosterImportRow[] {
     };
 
     if (row.tag_number && row.student_first_name && row.family_name && row.grade_room) {
-      rows.push(row);
+      if (isValidTagNumber(row.tag_number)) {
+        rows.push({
+          ...row,
+          tag_number: assertValidTagNumber(row.tag_number),
+        });
+      }
     }
   }
 

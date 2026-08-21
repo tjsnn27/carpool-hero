@@ -3,6 +3,7 @@ import { CloudDownload, Search, Upload, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import type { RosterData, RosterStudent } from '../types';
+import { studentStatusLabel } from '../lib/statusLabels';
 
 export default function AdminRosterPage() {
   const { refreshRosterGrades } = useAuth();
@@ -62,7 +63,7 @@ export default function AdminRosterPage() {
     }
   };
 
-  const sample = `TagNumber,StudentFirstName,FamilyName,GradeRoom
+  const sample = `StudentID,StudentFirstName,FamilyName,GradeRoom
 104,Emma,Smith Family,Grade 1
 205,Liam,Johnson Family,Grade 2
 312,Sophia,Williams Family,Grade 1`;
@@ -90,7 +91,7 @@ export default function AdminRosterPage() {
       <div className="bg-white rounded-2xl border-4 border-stone-900 p-5 shadow-[3px_3px_0_#1c1917]">
         <h2 className="font-black text-lg mb-3 flex items-center gap-2"><Upload size={20} /> CSV Import</h2>
         <p className="text-sm text-stone-600 mb-3 font-medium">
-          Required columns only: TagNumber, StudentFirstName, FamilyName, GradeRoom (comma or tab separated)
+          Required columns only: StudentID, StudentFirstName, FamilyName, GradeRoom (comma or tab separated)
         </p>
         <div
           className="border-3 border-dashed border-stone-400 rounded-xl p-8 text-center cursor-pointer hover:border-brand-600 mb-3"
@@ -124,7 +125,7 @@ export default function AdminRosterPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, family, tag, grade…"
+          placeholder="Search name, family, Student ID, grade…"
           className="w-full pl-10 pr-4 py-3 border-3 border-stone-900 rounded-xl font-bold bg-white"
         />
       </div>
@@ -133,7 +134,7 @@ export default function AdminRosterPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-brand-100 border-b-2 border-stone-900 text-left">
-              <th className="p-3 font-black">Tag</th>
+              <th className="p-3 font-black">Student ID</th>
               <th className="p-3 font-black">Student</th>
               <th className="p-3 font-black">Family</th>
               <th className="p-3 font-black">Grade</th>
@@ -148,7 +149,7 @@ export default function AdminRosterPage() {
                 <td className="p-3">{s.family_name}</td>
                 <td className="p-3 font-bold">{s.grade_room}</td>
                 <td className="p-3">
-                  <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-stone-100">{s.status.replace('_', ' ')}</span>
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-stone-100">{studentStatusLabel(s.status)}</span>
                 </td>
               </tr>
             ))}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Hash, Plus, Save, Tag, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import type { Student, TagRecord, UpsertTagPayload } from '../types';
+import { sanitizeTagNumberInput } from '../types';
 
 const emptyForm: UpsertTagPayload = {
   tag_number: '',
@@ -61,7 +62,7 @@ export default function AdminTagsPage() {
 
   const save = async () => {
     if (!form.tag_number.trim() || !form.family_name.trim()) {
-      setMessage('Tag number and family name are required.');
+      setMessage('Student ID and family name are required.');
       return;
     }
     setLoading(true);
@@ -76,7 +77,7 @@ export default function AdminTagsPage() {
       } else {
         await api.upsertTag(payload);
       }
-      setMessage(`Saved tag #${form.tag_number}`);
+      setMessage(`Saved Student ID ${form.tag_number}`);
       setEditing(null);
       setForm(emptyForm);
       setPickupsText('');
@@ -96,9 +97,9 @@ export default function AdminTagsPage() {
         <div className="flex items-center gap-3">
           <Tag className="text-brand-700" size={32} />
           <div>
-            <h1 className="text-2xl font-black text-stone-900">Placard Tags & Families</h1>
+            <h1 className="text-2xl font-black text-stone-900">Placard IDs & Families</h1>
             <p className="text-sm font-bold text-stone-600">
-              Map 2–4 digit tags to M365 students · {unassigned.length} unassigned
+              Map 1–5 digit Student IDs to families · {unassigned.length} unassigned
             </p>
           </div>
         </div>
@@ -106,24 +107,24 @@ export default function AdminTagsPage() {
           onClick={startNew}
           className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl font-black border-2 border-stone-900"
         >
-          <Plus size={18} /> New Tag
+          <Plus size={18} /> New Student ID
         </button>
       </div>
 
       {(editing === 'new' || editing) && (
         <div className="bg-white rounded-2xl border-4 border-stone-900 p-5 shadow-[3px_3px_0_#1c1917] space-y-4">
           <h2 className="font-black text-lg flex items-center gap-2">
-            <Hash size={20} /> {editing === 'new' ? 'New Placard Tag' : `Edit #${form.tag_number}`}
+            <Hash size={20} /> {editing === 'new' ? 'New Student ID' : `Edit ID ${form.tag_number}`}
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-bold text-stone-600">Tag Number *</span>
+              <span className="text-sm font-bold text-stone-600">Student ID *</span>
               <input
                 value={form.tag_number}
-                onChange={(e) => setForm((f) => ({ ...f, tag_number: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                onChange={(e) => setForm((f) => ({ ...f, tag_number: sanitizeTagNumberInput(e.target.value) }))}
                 disabled={editing !== 'new'}
                 className="mt-1 w-full border-2 border-stone-900 rounded-xl px-3 py-2 font-mono text-2xl font-black"
-                placeholder="104"
+                placeholder="10401"
               />
             </label>
             <label className="block">
@@ -210,7 +211,7 @@ export default function AdminTagsPage() {
         {tags.map((tag) => (
           <div key={tag.id} className="bg-white rounded-2xl border-4 border-stone-900 p-4 shadow-[2px_2px_0_#1c1917]">
             <div className="flex justify-between items-start mb-2">
-              <span className="text-3xl font-black text-brand-700">#{tag.tag_number}</span>
+              <span className="text-3xl font-black text-brand-700">ID {tag.tag_number}</span>
               <button onClick={() => startEdit(tag)} className="text-sm font-bold text-brand-700 underline">
                 Edit
               </button>

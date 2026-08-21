@@ -45,15 +45,22 @@ app.post('/api/queue', async (req, res) => {
 app.patch('/api/queue/:id', async (req, res) => {
   try {
     let item;
+    let removed = false;
     if (req.body.student_id) {
-      item = await db.stageStudent(req.body.student_id);
+      if (req.body.action === 'load') {
+        item = await db.loadStudent(req.body.student_id);
+        removed = !!item && item.status === 'loaded';
+      } else {
+        item = await db.stageStudent(req.body.student_id);
+      }
       if (!item) return res.status(404).json({ error: 'Not found' });
     } else if (req.body.status) {
       item = await db.updateQueueStatus(req.params.id, req.body.status);
+      removed = req.body.status === 'loaded';
     } else {
       return res.status(400).json({ error: 'status or student_id required' });
     }
-    if (req.body.status === 'loaded') {
+    if (removed) {
       await publish({ type: 'QUEUE_REMOVED', data: { id: item.id } });
     } else {
       await publish({ type: 'QUEUE_UPDATED', data: item });

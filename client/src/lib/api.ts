@@ -30,7 +30,13 @@ export const api = {
   stageStudent: (id: string, student_id: string) =>
     request<QueueItem>(`/queue/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ student_id }),
+      body: JSON.stringify({ student_id, action: 'release' }),
+    }),
+
+  loadStudent: (id: string, student_id: string) =>
+    request<QueueItem>(`/queue/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ student_id, action: 'load' }),
     }),
 
   undoLast: () => request<{ undone: QueueItem | null }>('/queue/undo', { method: 'POST' }),

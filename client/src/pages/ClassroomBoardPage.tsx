@@ -3,6 +3,7 @@ import { AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../auth/AuthProvider';
 import { useRealtime } from '../hooks/useRealtime';
+import { studentStatusLabel } from '../lib/statusLabels';
 import type { QueueItem } from '../types';
 
 function speak(text: string) {
@@ -35,6 +36,13 @@ const statusStyle: Record<string, string> = {
   calling: 'border-blue-500 bg-blue-50',
   staged: 'border-blue-600 bg-blue-50',
   loaded: 'border-green-600 bg-green-50',
+};
+
+const studentStatusStyle: Record<string, string> = {
+  in_class: 'bg-stone-200 text-stone-800',
+  staged: 'bg-blue-200 text-blue-900',
+  loaded: 'bg-green-200 text-green-900',
+  absent: 'bg-stone-100 text-stone-500',
 };
 
 export default function ClassroomBoardPage() {
@@ -77,21 +85,16 @@ export default function ClassroomBoardPage() {
             .filter((s) => !gradeFilter || s.grade_room === gradeFilter)
             .map((s) => `${s.first_name} ${s.last_name}`)
             .join(', ');
-          if (names) speak(`${names}. Tag ${item.tag_number}.`);
+          if (names) speak(`${names}. Student ID ${item.tag_number}.`);
         }
       }
     }
     prevIds.current = new Set(filtered.map((q) => q.id));
   }, [filtered, chime, tts, gradeFilter]);
 
-  const stageStudent = async (item: QueueItem, studentId: string) => {
+  const releaseStudent = async (item: QueueItem, studentId: string) => {
     const updated = await api.stageStudent(item.id, studentId);
     applyMessage({ type: 'QUEUE_UPDATED', data: updated });
-  };
-
-  const markLoaded = async (item: QueueItem) => {
-    await api.updateQueue(item.id, 'loaded');
-    applyMessage({ type: 'QUEUE_REMOVED', data: { id: item.id } });
   };
 
   return (
@@ -150,7 +153,10 @@ export default function ClassroomBoardPage() {
               className={`rounded-2xl border-4 p-4 shadow-[3px_3px_0_#1c1917] ${statusStyle[item.status] ?? statusStyle.waiting}`}
             >
               <div className="flex justify-between items-start mb-3">
-                <span className="text-4xl font-black text-brand-700">#{item.tag_number}</span>
+                <div>
+                  <p className="text-xs font-bold uppercase text-stone-600">Student ID</p>
+                  <span className="text-4xl font-black text-brand-700">#{item.tag_number}</span>
+                </div>
                 <span className="text-xs font-black uppercase px-2 py-1 rounded-lg bg-white border-2 border-stone-900">
                   {item.status}
                 </span>
@@ -164,33 +170,31 @@ export default function ClassroomBoardPage() {
                 </div>
               )}
 
-              <ul className="space-y-2 mb-4">
+              <ul className="space-y-2">
                 {item.students
                   .filter((s) => !gradeFilter || s.grade_room === gradeFilter)
                   .map((s) => (
-                    <li key={s.id} className="flex justify-between items-center bg-white/70 rounded-xl px-3 py-2 border-2 border-stone-800">
-                      <div>
+                    <li key={s.id} className="flex justify-between items-center gap-2 bg-white/70 rounded-xl px-3 py-2 border-2 border-stone-800">
+                      <div className="min-w-0">
                         <p className="font-black text-stone-900">{s.first_name} {s.last_name}</p>
                         <p className="text-sm font-bold text-stone-600">{s.grade_room}</p>
                       </div>
-                      {s.status !== 'staged' && s.status !== 'loaded' && (
-                        <button
-                          onClick={() => stageStudent(item, s.id)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg font-bold text-sm border-2 border-stone-900"
-                        >
-                          Stage →
-                        </button>
-                      )}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${studentStatusStyle[s.status] ?? studentStatusStyle.in_class}`}>
+                          {studentStatusLabel(s.status)}
+                        </span>
+                        {s.status === 'in_class' && (
+                          <button
+                            onClick={() => releaseStudent(item, s.id)}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg font-bold text-xs border-2 border-stone-900 whitespace-nowrap"
+                          >
+                            Release from Class
+                          </button>
+                        )}
+                      </div>
                     </li>
                   ))}
               </ul>
-
-              <button
-                onClick={() => markLoaded(item)}
-                className="w-full py-3 bg-green-600 text-white rounded-xl font-black text-lg border-3 border-stone-900 active:scale-[0.98]"
-              >
-                ✓ Dismiss / Loaded
-              </button>
             </article>
           ))}
         </div>

@@ -52,22 +52,31 @@ app.http('queuePatch', {
     }
     try {
       const id = req.params.id;
-      const body = (await req.json()) as { status?: string; student_id?: string };
+      const body = (await req.json()) as { status?: string; student_id?: string; action?: string };
 
       let item;
+      let removed = false;
       if (body.student_id) {
-        item = await db.stageStudent(body.student_id);
-        if (!item) {
-          return { status: 404, jsonBody: { error: 'Queue entry not found' }, headers: corsHeaders() };
+        if (body.action === 'load') {
+          item = await db.loadStudent(body.student_id);
+          if (!item) {
+            return { status: 404, jsonBody: { error: 'Queue entry not found' }, headers: corsHeaders() };
+          }
+          removed = item.status === 'loaded';
+        } else {
+          item = await db.stageStudent(body.student_id);
+          if (!item) {
+            return { status: 404, jsonBody: { error: 'Queue entry not found' }, headers: corsHeaders() };
+          }
         }
       } else if (body.status) {
         item = await db.updateQueueStatus(id, body.status as 'waiting' | 'staged' | 'loaded' | 'cancelled');
+        removed = body.status === 'loaded';
       } else {
         return { status: 400, jsonBody: { error: 'status or student_id required' }, headers: corsHeaders() };
       }
 
-      const msgType = body.status === 'loaded' ? 'QUEUE_REMOVED' : 'QUEUE_UPDATED';
-      if (msgType === 'QUEUE_REMOVED') {
+      if (removed) {
         await publish({ type: 'QUEUE_REMOVED', data: { id: item.id } });
       } else {
         await publish({ type: 'QUEUE_UPDATED', data: item });
