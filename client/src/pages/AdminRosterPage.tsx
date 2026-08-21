@@ -64,9 +64,9 @@ export default function AdminRosterPage() {
   };
 
   const sample = `StudentID,StudentFirstName,FamilyName,GradeRoom
-104,Emma,Smith Family,Grade 1
-205,Liam,Johnson Family,Grade 2
-312,Sophia,Williams Family,Grade 1`;
+10049,Madhumitha,J,Grade 2(Tamil)
+10035,Jishna,A,Grade 1(Tamil)
+10055,Yugan,A,Pre-KG (Tamil)`;
 
   return (
     <div className="space-y-6 pb-8">

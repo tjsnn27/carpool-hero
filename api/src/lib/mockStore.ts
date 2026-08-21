@@ -15,8 +15,9 @@ import type {
   UpsertTagPayload,
 } from './types';
 import { today } from './types';
-import { lastNameFromFamily } from './csvParser';
+import { lastNameFromFamily, parseCsv } from './csvParser';
 import { assertValidTagNumber } from './tagNumber';
+import { STARTUP_ROSTER_CSV } from './startupRoster';
 
 const bus = new EventEmitter();
 bus.setMaxListeners(100);
@@ -48,46 +49,70 @@ function makeStudent(
   };
 }
 
+function applyRosterRows(rows: RosterImportRow[]): {
+  familiesCreated: number;
+  studentsCreated: number;
+  studentsUpdated: number;
+} {
+  let familiesCreated = 0;
+  let studentsCreated = 0;
+  let studentsUpdated = 0;
+
+  for (const row of rows) {
+    let tag: string;
+    try {
+      tag = assertValidTagNumber(row.tag_number);
+    } catch {
+      continue;
+    }
+    if (!row.family_name || !row.student_first_name || !row.grade_room) continue;
+
+    let family = families.find((f) => f.tag_number === tag);
+    if (!family) {
+      family = {
+        id: randomUUID(),
+        tag_number: tag,
+        family_name: row.family_name.trim(),
+        primary_phone: null,
+        authorized_pickups: [],
+        safety_notes: '',
+      };
+      families.push(family);
+      familiesCreated++;
+    } else {
+      family.family_name = row.family_name.trim();
+    }
+
+    const lastName = lastNameFromFamily(row.family_name);
+    const student = students.find(
+      (s) =>
+        s.family_id === family!.id &&
+        s.first_name === row.student_first_name.trim() &&
+        s.last_name === lastName
+    );
+
+    if (student) {
+      student.grade_room = row.grade_room.trim();
+      studentsUpdated++;
+    } else {
+      students.push(
+        makeStudent({
+          family_id: family.id,
+          first_name: row.student_first_name.trim(),
+          last_name: lastName,
+          grade_room: row.grade_room.trim(),
+        })
+      );
+      studentsCreated++;
+    }
+  }
+
+  return { familiesCreated, studentsCreated, studentsUpdated };
+}
+
 function seedIfEmpty() {
   if (students.length > 0) return;
-
-  const smithId = randomUUID();
-  const johnsonId = randomUUID();
-  const williamsId = randomUUID();
-
-  families = [
-    {
-      id: smithId,
-      tag_number: '104',
-      family_name: 'Smith Family',
-      primary_phone: '555-0104',
-      authorized_pickups: ['John Smith', 'Jane Smith'],
-      safety_notes: '',
-    },
-    {
-      id: johnsonId,
-      tag_number: '205',
-      family_name: 'Johnson Family',
-      primary_phone: '555-0205',
-      authorized_pickups: ['Mike Johnson'],
-      safety_notes: 'Custody: mother only pickup',
-    },
-    {
-      id: williamsId,
-      tag_number: '312',
-      family_name: 'Williams Family',
-      primary_phone: '555-0312',
-      authorized_pickups: ['Chris Williams'],
-      safety_notes: 'Allergy: peanuts',
-    },
-  ];
-
-  students = [
-    makeStudent({ family_id: smithId, m365_user_id: 'm365-emma', m365_group_id: 'mock-group-g1', first_name: 'Emma', last_name: 'Smith', grade_room: 'Grade 1' }),
-    makeStudent({ family_id: smithId, m365_user_id: 'm365-olivia', m365_group_id: 'mock-group-g1', first_name: 'Olivia', last_name: 'Brown', grade_room: 'Grade 1' }),
-    makeStudent({ family_id: johnsonId, m365_user_id: 'm365-liam', m365_group_id: 'mock-group-g2', first_name: 'Liam', last_name: 'Johnson', grade_room: 'Grade 2' }),
-    makeStudent({ family_id: williamsId, m365_user_id: 'm365-sophia', m365_group_id: 'mock-group-g1', first_name: 'Sophia', last_name: 'Williams', grade_room: 'Grade 1' }),
-  ];
+  applyRosterRows(parseCsv(STARTUP_ROSTER_CSV));
 }
 
 export function subscribe(listener: (msg: RealtimeMessage) => void): () => void {
@@ -344,60 +369,8 @@ export const mockStore = {
 
   importRoster(rows: RosterImportRow[]) {
     seedIfEmpty();
-    let familiesCreated = 0;
-    let studentsCreated = 0;
-    let studentsUpdated = 0;
-
-    for (const row of rows) {
-      let tag: string;
-      try {
-        tag = assertValidTagNumber(row.tag_number);
-      } catch {
-        continue;
-      }
-      if (!row.family_name || !row.student_first_name || !row.grade_room) continue;
-
-      let family = families.find((f) => f.tag_number === tag);
-      if (!family) {
-        family = {
-          id: randomUUID(),
-          tag_number: tag,
-          family_name: row.family_name.trim(),
-          primary_phone: null,
-          authorized_pickups: [],
-          safety_notes: '',
-        };
-        families.push(family);
-        familiesCreated++;
-      } else {
-        family.family_name = row.family_name.trim();
-      }
-
-      const lastName = lastNameFromFamily(row.family_name);
-      const student = students.find(
-        (s) =>
-          s.family_id === family!.id &&
-          s.first_name === row.student_first_name.trim() &&
-          s.last_name === lastName
-      );
-
-      if (student) {
-        student.grade_room = row.grade_room.trim();
-        studentsUpdated++;
-      } else {
-        students.push(
-          makeStudent({
-            family_id: family.id,
-            first_name: row.student_first_name.trim(),
-            last_name: lastName,
-            grade_room: row.grade_room.trim(),
-          })
-        );
-        studentsCreated++;
-      }
-    }
-
-    return { familiesCreated, studentsCreated, studentsUpdated, rowsProcessed: rows.length };
+    const result = applyRosterRows(rows);
+    return { ...result, rowsProcessed: rows.length };
   },
 
   getPickupZone(): PickupZone {

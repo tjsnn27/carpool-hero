@@ -16,6 +16,7 @@ const COLUMN_ALIASES: Record<string, keyof RosterImportRow> = {
   studentid: 'tag_number',
   student_first_name: 'student_first_name',
   studentfirstname: 'student_first_name',
+  studentfirst_name: 'student_first_name',
   student_first: 'student_first_name',
   first_name: 'student_first_name',
   firstname: 'student_first_name',
