@@ -180,7 +180,7 @@ export default function ClassroomBoardPage() {
                         <p className="text-sm font-bold text-stone-600">{s.grade_room}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${studentStatusStyle[s.status] ?? studentStatusStyle.in_class}`}>
+                        <span className={`text-xs font-black px-2 py-1 rounded-lg whitespace-nowrap ${studentStatusStyle[s.status] ?? studentStatusStyle.in_class}`}>
                           {studentStatusLabel(s.status)}
                         </span>
                         {s.status === 'in_class' && (

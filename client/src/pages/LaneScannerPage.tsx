@@ -76,7 +76,7 @@ export default function LaneScannerPage() {
         flash(true, `${updated.family_name} — all loaded`);
       } else {
         applyMessage({ type: 'QUEUE_UPDATED', data: updated });
-        flash(true, 'Student loaded');
+        flash(true, 'Student loaded into pickup vehicle');
       }
     } catch (err) {
       flash(false, err instanceof Error ? err.message : 'Load failed');
@@ -112,7 +112,7 @@ export default function LaneScannerPage() {
   return (
     <div className="max-w-md mx-auto space-y-4 pb-8">
       <div className="bg-stone-100 border-2 border-stone-400 rounded-xl px-4 py-3 text-sm font-bold text-stone-700">
-        Enter the Student ID from the car placard. Mark each child as Loaded once they are in the vehicle.
+        Enter the Student ID from the car placard. Mark each released student with Load into Pickup vehicle once they are in the car.
       </div>
 
       <div className="flex items-center justify-between">
@@ -201,15 +201,15 @@ export default function LaneScannerPage() {
                   <li key={s.id} className="flex justify-between items-center gap-2 bg-stone-50 rounded-lg px-3 py-2">
                     <div>
                       <p className="font-bold text-stone-900">{s.first_name} {s.last_name}</p>
-                      <p className="text-xs font-bold text-stone-600">{studentStatusLabel(s.status)}</p>
+                      <p className="text-xs font-bold text-stone-600 whitespace-nowrap">{studentStatusLabel(s.status)}</p>
                     </div>
                     {s.status === 'staged' && (
                       <button
                         disabled={loadingStudentId === s.id}
                         onClick={() => markLoaded(item, s.id)}
-                        className="px-3 py-2 bg-green-600 text-white rounded-lg font-black text-sm border-2 border-stone-900 disabled:opacity-50"
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg font-black text-xs border-2 border-stone-900 disabled:opacity-50 whitespace-nowrap shrink-0"
                       >
-                        Loaded
+                        Load into Pickup vehicle
                       </button>
                     )}
                   </li>
