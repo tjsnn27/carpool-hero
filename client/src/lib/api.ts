@@ -41,6 +41,18 @@ export const api = {
 
   undoLast: () => request<{ undone: QueueItem | null }>('/queue/undo', { method: 'POST' }),
 
+  morningCheckIn: (tag_number: string) =>
+    request<import('../types').RosterStudent>('/students/morning-check-in', {
+      method: 'POST',
+      body: JSON.stringify({ tag_number }),
+    }),
+
+  morningCheckInStudent: (student_id: string) =>
+    request<import('../types').RosterStudent>('/students/morning-check-in', {
+      method: 'POST',
+      body: JSON.stringify({ student_id }),
+    }),
+
   negotiate: () => request<{ url: string } | { mock: true }>('/negotiate'),
 
   getRoster: () => request<RosterData>('/roster'),

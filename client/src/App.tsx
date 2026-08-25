@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { Car, ClipboardList, MapPin, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
+import { Car, ClipboardList, LogIn, MapPin, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from './auth/AuthProvider';
 import { RoleGate } from './components/RoleGate';
 import { useRealtime } from './hooks/useRealtime';
@@ -8,10 +8,12 @@ import ClassroomBoardPage from './pages/ClassroomBoardPage';
 import AdminRosterPage from './pages/AdminRosterPage';
 import AdminTagsPage from './pages/AdminTagsPage';
 import AdminPickupZonePage from './pages/AdminPickupZonePage';
+import MorningCheckInPage from './pages/MorningCheckInPage';
 import type { StaffRole } from './types';
 import { STAFF_ROLE_LABELS } from './types';
 
 const nav: { to: string; label: string; icon: typeof Car; roles?: StaffRole[] }[] = [
+  { to: '/morning-check-in', label: 'Morning Check-In', icon: LogIn, roles: ['hallmonitor', 'trafficcontroller', 'admin'] },
   { to: '/lane-scanner', label: 'Traffic Control', icon: Car, roles: ['trafficcontroller', 'admin'] },
   { to: '/classroom-board', label: 'Board', icon: ClipboardList, roles: ['hallmonitor', 'admin'] },
   { to: '/admin-roster', label: 'Roster', icon: Shield, roles: ['admin'] },
@@ -102,6 +104,14 @@ export default function App() {
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/driver-pickup" element={<Navigate to="/" replace />} />
           <Route path="/faq" element={<Navigate to="/" replace />} />
+          <Route
+            path="/morning-check-in"
+            element={
+              <RoleGate roles={['hallmonitor', 'trafficcontroller', 'admin']}>
+                <MorningCheckInPage />
+              </RoleGate>
+            }
+          />
           <Route
             path="/lane-scanner"
             element={

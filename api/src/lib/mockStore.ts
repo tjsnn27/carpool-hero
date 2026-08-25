@@ -33,6 +33,27 @@ let pickupZone: PickupZone = {
   radius_meters: 100,
 };
 
+let lastSessionDate = '';
+
+function ensureDailySession() {
+  const sessionDate = today();
+  if (lastSessionDate === sessionDate) return;
+  students.forEach((s) => {
+    if (s.status !== 'absent') s.status = 'not_checked_in';
+  });
+  queue = queue.filter((q) => q.session_date === sessionDate);
+  lastSessionDate = sessionDate;
+}
+
+function rosterStudentRow(s: Student) {
+  const f = s.family_id ? families.find((fam) => fam.id === s.family_id) : null;
+  return {
+    ...s,
+    tag_number: f?.tag_number ?? '',
+    family_name: f?.family_name ?? '(unassigned)',
+  };
+}
+
 function makeStudent(
   partial: Pick<Student, 'first_name' | 'last_name' | 'grade_room'> &
     Partial<Omit<Student, 'first_name' | 'last_name' | 'grade_room'>>
@@ -46,7 +67,7 @@ function makeStudent(
     first_name: partial.first_name,
     last_name: partial.last_name,
     grade_room: partial.grade_room,
-    status: partial.status ?? 'in_class',
+    status: partial.status ?? 'not_checked_in',
   };
 }
 
@@ -114,6 +135,7 @@ function applyRosterRows(rows: RosterImportRow[]): {
 function seedIfEmpty() {
   if (students.length > 0) return;
   applyRosterRows(parseCsv(STARTUP_ROSTER_CSV));
+  lastSessionDate = today();
 }
 
 export function subscribe(listener: (msg: RealtimeMessage) => void): () => void {
@@ -147,10 +169,12 @@ function buildQueueItem(family: Family, laneNumber: number): QueueItem {
 export const mockStore = {
   init() {
     seedIfEmpty();
+    ensureDailySession();
   },
 
   getQueue(sessionDate = today()): QueueItem[] {
     seedIfEmpty();
+    ensureDailySession();
     return queue
       .filter((q) => q.session_date === sessionDate && q.status !== 'cancelled' && q.status !== 'loaded')
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -163,16 +187,10 @@ export const mockStore = {
 
   getRoster() {
     seedIfEmpty();
+    ensureDailySession();
     return {
       families: [...families],
-      students: students.map((s) => {
-        const f = s.family_id ? families.find((fam) => fam.id === s.family_id) : null;
-        return {
-          ...s,
-          tag_number: f?.tag_number ?? '',
-          family_name: f?.family_name ?? '(unassigned)',
-        };
-      }),
+      students: students.map((s) => rosterStudentRow(s)),
     };
   },
 
@@ -330,7 +348,11 @@ export const mockStore = {
     const student = students.find((s) => s.id === studentId);
     if (!student) throw new Error('Student not found');
     if (student.status !== 'in_class') {
-      throw new Error('Student is not in class');
+      throw new Error(
+        student.status === 'not_checked_in'
+          ? 'Student must be checked in before release from class'
+          : 'Student is not in class'
+      );
     }
     student.status = 'staged';
 
@@ -367,6 +389,46 @@ export const mockStore = {
       item.dismissed_at = new Date().toISOString();
     }
     return item;
+  },
+
+  morningCheckIn(tagNumber: string) {
+    seedIfEmpty();
+    ensureDailySession();
+    tagNumber = assertValidTagNumber(tagNumber);
+    const family = families.find((f) => f.tag_number === tagNumber);
+    if (!family) throw new Error(`No student found for Student ID ${tagNumber}`);
+
+    const student = students.find((s) => s.family_id === family.id);
+    if (!student) throw new Error(`No student found for Student ID ${tagNumber}`);
+
+    if (student.status === 'in_class') {
+      throw new Error(`${student.first_name} is already checked in`);
+    }
+    if (student.status !== 'not_checked_in') {
+      throw new Error(`${student.first_name} cannot be checked in right now`);
+    }
+
+    student.status = 'in_class';
+    return rosterStudentRow(student);
+  },
+
+  morningCheckInStudent(studentId: string) {
+    seedIfEmpty();
+    ensureDailySession();
+    const student = students.find((s) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    const f = student.family_id ? families.find((fam) => fam.id === student.family_id) : null;
+    if (!f?.tag_number) throw new Error('Student has no Student ID assigned');
+
+    if (student.status === 'in_class') {
+      throw new Error(`${student.first_name} is already checked in`);
+    }
+    if (student.status !== 'not_checked_in') {
+      throw new Error(`${student.first_name} cannot be checked in right now`);
+    }
+
+    student.status = 'in_class';
+    return rosterStudentRow(student);
   },
 
   importRoster(rows: RosterImportRow[]) {

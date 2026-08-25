@@ -39,6 +39,7 @@ const statusStyle: Record<string, string> = {
 };
 
 const studentStatusStyle: Record<string, string> = {
+  not_checked_in: 'bg-orange-200 text-orange-900',
   in_class: 'bg-stone-200 text-stone-800',
   staged: 'bg-blue-200 text-blue-900',
   loaded: 'bg-green-200 text-green-900',

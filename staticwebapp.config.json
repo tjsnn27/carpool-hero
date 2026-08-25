@@ -5,6 +5,14 @@
   },
   "routes": [
     {
+      "route": "/morning-check-in",
+      "allowedRoles": ["admin", "hallmonitor", "trafficcontroller"]
+    },
+    {
+      "route": "/morning-check-in/*",
+      "allowedRoles": ["admin", "hallmonitor", "trafficcontroller"]
+    },
+    {
       "route": "/admin-pickup-zone",
       "allowedRoles": ["admin"]
     },

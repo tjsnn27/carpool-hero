@@ -141,6 +141,32 @@ app.http('rosterGet', {
   },
 });
 
+app.http('studentsMorningCheckIn', {
+  methods: ['POST', 'OPTIONS'],
+  authLevel: 'anonymous',
+  route: 'students/morning-check-in',
+  handler: async (req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    if (req.method === 'OPTIONS') {
+      return { status: 204, headers: corsHeaders() };
+    }
+    try {
+      const body = (await req.json()) as { tag_number?: string; student_id?: string };
+      let student;
+      if (body.student_id) {
+        student = await db.morningCheckInStudent(body.student_id);
+      } else if (body.tag_number) {
+        student = await db.morningCheckIn(String(body.tag_number).trim());
+      } else {
+        return { status: 400, jsonBody: { error: 'tag_number or student_id required' }, headers: corsHeaders() };
+      }
+      await publish({ type: 'STUDENT_CHECKED_IN', data: student });
+      return { status: 200, jsonBody: student, headers: corsHeaders() };
+    } catch (err) {
+      return { status: 400, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
+    }
+  },
+});
+
 app.http('rosterImport', {
   methods: ['POST', 'OPTIONS'],
   authLevel: 'anonymous',

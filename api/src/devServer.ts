@@ -97,6 +97,23 @@ app.get('/api/roster', async (_req, res) => {
   }
 });
 
+app.post('/api/students/morning-check-in', async (req, res) => {
+  try {
+    let student;
+    if (req.body.student_id) {
+      student = await db.morningCheckInStudent(req.body.student_id);
+    } else if (req.body.tag_number) {
+      student = await db.morningCheckIn(String(req.body.tag_number).trim());
+    } else {
+      return res.status(400).json({ error: 'tag_number or student_id required' });
+    }
+    await publish({ type: 'STUDENT_CHECKED_IN', data: student });
+    res.json(student);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
 app.post('/api/roster/import', async (req, res) => {
   try {
     const rows = parseCsv(req.body.csv ?? '');

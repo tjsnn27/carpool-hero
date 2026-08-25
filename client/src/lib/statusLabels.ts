@@ -1,6 +1,7 @@
 import type { QueueStatus, StudentStatus } from '../types';
 
 export const STUDENT_STATUS_LABELS: Record<StudentStatus, string> = {
+  not_checked_in: 'Not Checked In',
   in_class: 'In Class',
   staged: 'Released from Class',
   loaded: 'Loaded',

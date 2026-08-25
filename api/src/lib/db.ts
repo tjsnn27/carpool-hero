@@ -146,7 +146,11 @@ export const db = {
     if (studentResult.rows.length === 0) throw new Error('Student not found');
     const student = studentResult.rows[0];
     if (student.status !== 'in_class') {
-      throw new Error('Student is not in class');
+      throw new Error(
+        student.status === 'not_checked_in'
+          ? 'Student must be checked in before release from class'
+          : 'Student is not in class'
+      );
     }
 
     await getPool().query(`UPDATE students SET status = 'staged' WHERE id = $1`, [studentId]);
@@ -232,6 +236,53 @@ export const db = {
        ) RETURNING *`
     );
     return result.rows[0] ?? null;
+  },
+
+  async morningCheckIn(tagNumber: string) {
+    if (isMockMode()) return mockStore.morningCheckIn(tagNumber);
+
+    tagNumber = assertValidTagNumber(tagNumber);
+    const updated = await getPool().query(
+      `UPDATE students s SET status = 'in_class'
+       FROM families f
+       WHERE s.family_id = f.id AND f.tag_number = $1 AND s.status = 'not_checked_in'
+       RETURNING s.*, f.tag_number, f.family_name`,
+      [tagNumber]
+    );
+    if (updated.rows.length > 0) return updated.rows[0];
+
+    const existing = await getPool().query(
+      `SELECT s.status, s.first_name FROM students s
+       JOIN families f ON f.id = s.family_id
+       WHERE f.tag_number = $1`,
+      [tagNumber]
+    );
+    if (existing.rows.length === 0) throw new Error(`No student found for Student ID ${tagNumber}`);
+    const row = existing.rows[0];
+    if (row.status === 'in_class') throw new Error(`${row.first_name} is already checked in`);
+    throw new Error(`${row.first_name} cannot be checked in right now`);
+  },
+
+  async morningCheckInStudent(studentId: string) {
+    if (isMockMode()) return mockStore.morningCheckInStudent(studentId);
+
+    const updated = await getPool().query(
+      `UPDATE students SET status = 'in_class'
+       WHERE id = $1 AND status = 'not_checked_in'
+       RETURNING *`,
+      [studentId]
+    );
+    if (updated.rows.length > 0) {
+      const student = updated.rows[0];
+      const family = await getPool().query('SELECT tag_number, family_name FROM families WHERE id = $1', [student.family_id]);
+      return { ...student, tag_number: family.rows[0]?.tag_number ?? '', family_name: family.rows[0]?.family_name ?? '' };
+    }
+
+    const existing = await getPool().query('SELECT first_name, status FROM students WHERE id = $1', [studentId]);
+    if (existing.rows.length === 0) throw new Error('Student not found');
+    const row = existing.rows[0];
+    if (row.status === 'in_class') throw new Error(`${row.first_name} is already checked in`);
+    throw new Error(`${row.first_name} cannot be checked in right now`);
   },
 
   async getRoster() {
