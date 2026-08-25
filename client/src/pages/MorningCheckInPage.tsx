@@ -7,6 +7,12 @@ import { TAG_NUMBER_MAX_LENGTH } from '../types';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'enter'] as const;
 
+function studentNameSort(a: RosterStudent, b: RosterStudent): number {
+  const byFirst = a.first_name.localeCompare(b.first_name, undefined, { sensitivity: 'base' });
+  if (byFirst !== 0) return byFirst;
+  return a.last_name.localeCompare(b.last_name, undefined, { sensitivity: 'base' });
+}
+
 export default function MorningCheckInPage() {
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [input, setInput] = useState('');
@@ -88,17 +94,19 @@ export default function MorningCheckInPage() {
 
   const notCheckedIn = useMemo(() => {
     const q = search.toLowerCase();
-    return students.filter((s) => {
-      if (s.status !== 'not_checked_in') return false;
-      if (gradeFilter && s.grade_room !== gradeFilter) return false;
-      if (!q) return true;
-      return (
-        s.first_name.toLowerCase().includes(q) ||
-        s.last_name.toLowerCase().includes(q) ||
-        s.tag_number.includes(q) ||
-        s.grade_room.toLowerCase().includes(q)
-      );
-    });
+    return students
+      .filter((s) => {
+        if (s.status !== 'not_checked_in') return false;
+        if (gradeFilter && s.grade_room !== gradeFilter) return false;
+        if (!q) return true;
+        return (
+          s.first_name.toLowerCase().includes(q) ||
+          s.last_name.toLowerCase().includes(q) ||
+          s.tag_number.includes(q) ||
+          s.grade_room.toLowerCase().includes(q)
+        );
+      })
+      .sort(studentNameSort);
   }, [students, search, gradeFilter]);
 
   const checkedInCount = students.filter((s) => s.status === 'in_class').length;
