@@ -6,6 +6,7 @@ import { fetchClassGroups } from './graph';
 import { lastNameFromFamily } from './csvParser';
 import { normalizePickupLocation } from './pickupLocations';
 import { assertValidTagNumber } from './tagNumber';
+import { assertAdminPassword } from './adminAuth';
 
 let pool: Pool | null = null;
 
@@ -80,9 +81,29 @@ export const db = {
         [tagNumber, sessionDate]
       );
       if (existing.rows.length > 0) {
+        const notReady = await client.query(
+          `SELECT first_name FROM students WHERE family_id = $1 AND status = 'not_checked_in' LIMIT 1`,
+          [family.id]
+        );
+        if (notReady.rows.length > 0) {
+          throw new Error(`${notReady.rows[0].first_name} must complete morning check-in first`);
+        }
+        await client.query(
+          `UPDATE students SET status = 'pickup_arrived'
+           WHERE family_id = $1 AND status = 'in_class'`,
+          [family.id]
+        );
         await client.query('COMMIT');
         const studentsResult = await getPool().query('SELECT * FROM students WHERE family_id = $1', [family.id]);
         return mapQueueRow({ ...existing.rows[0], ...family }, studentsResult.rows);
+      }
+
+      const notReady = await client.query(
+        `SELECT first_name FROM students WHERE family_id = $1 AND status = 'not_checked_in' LIMIT 1`,
+        [family.id]
+      );
+      if (notReady.rows.length > 0) {
+        throw new Error(`${notReady.rows[0].first_name} must complete morning check-in first`);
       }
 
       const insertResult = await client.query(
@@ -91,6 +112,11 @@ export const db = {
         [tagNumber, family.id, laneNumber, sessionDate]
       );
 
+      await client.query(
+        `UPDATE students SET status = 'pickup_arrived'
+         WHERE family_id = $1 AND status = 'in_class'`,
+        [family.id]
+      );
       await client.query('COMMIT');
 
       const studentsResult = await getPool().query('SELECT * FROM students WHERE family_id = $1', [family.id]);
@@ -117,12 +143,6 @@ export const db = {
       if (qResult.rows.length === 0) throw new Error('Queue entry not found');
       const entry = qResult.rows[0];
 
-      if (status === 'staged') {
-        await client.query(
-          `UPDATE students SET status = 'staged' WHERE family_id = $1 AND status != 'loaded'`,
-          [entry.family_id]
-        );
-      }
       if (status === 'loaded') {
         await client.query(`UPDATE students SET status = 'loaded' WHERE family_id = $1`, [entry.family_id]);
       }
@@ -145,15 +165,17 @@ export const db = {
     const studentResult = await getPool().query('SELECT * FROM students WHERE id = $1', [studentId]);
     if (studentResult.rows.length === 0) throw new Error('Student not found');
     const student = studentResult.rows[0];
-    if (student.status !== 'in_class') {
+    if (student.status !== 'pickup_arrived') {
       throw new Error(
         student.status === 'not_checked_in'
-          ? 'Student must be checked in before release from class'
-          : 'Student is not in class'
+          ? 'Student must be checked in and have pickup arrived before release'
+          : student.status === 'in_class'
+            ? 'Pickup must arrive before release from class'
+            : 'Student is not ready to be released from class'
       );
     }
 
-    await getPool().query(`UPDATE students SET status = 'staged' WHERE id = $1`, [studentId]);
+    await getPool().query(`UPDATE students SET status = 'released_from_class' WHERE id = $1`, [studentId]);
 
     await getPool().query(
       `UPDATE carpool_queue SET status = 'calling'
@@ -182,7 +204,7 @@ export const db = {
       const studentResult = await client.query('SELECT * FROM students WHERE id = $1 FOR UPDATE', [studentId]);
       if (studentResult.rows.length === 0) throw new Error('Student not found');
       const student = studentResult.rows[0];
-      if (student.status !== 'staged') {
+      if (student.status !== 'released_from_class') {
         throw new Error('Student must be released from class before loading');
       }
 
@@ -283,6 +305,31 @@ export const db = {
     const row = existing.rows[0];
     if (row.status === 'in_class') throw new Error(`${row.first_name} is already checked in`);
     throw new Error(`${row.first_name} cannot be checked in right now`);
+  },
+
+  async restartSession(password: string) {
+    assertAdminPassword(password);
+    if (isMockMode()) return mockStore.restartSession(password);
+
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE students SET status = 'not_checked_in' WHERE status NOT IN ('absent', 'not_checked_in')`
+      );
+      await client.query(
+        `UPDATE carpool_queue SET status = 'cancelled'
+         WHERE session_date = CURRENT_DATE AND status NOT IN ('cancelled', 'loaded')`
+      );
+      await client.query('COMMIT');
+      const countResult = await getPool().query(`SELECT COUNT(*)::int AS n FROM students WHERE status != 'absent'`);
+      return { session_date: today(), studentsReset: countResult.rows[0].n as number };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   },
 
   async getRoster() {

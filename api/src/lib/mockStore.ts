@@ -35,12 +35,23 @@ let pickupZone: PickupZone = {
 
 let lastSessionDate = '';
 
-function ensureDailySession() {
-  const sessionDate = today();
-  if (lastSessionDate === sessionDate) return;
+function isSunday(dateStr: string): boolean {
+  return new Date(`${dateStr}T12:00:00`).getDay() === 0;
+}
+
+function resetSessionStatuses() {
   students.forEach((s) => {
     if (s.status !== 'absent') s.status = 'not_checked_in';
   });
+  queue = [];
+}
+
+function ensureDailySession() {
+  const sessionDate = today();
+  if (lastSessionDate === sessionDate) return;
+  if (isSunday(sessionDate)) {
+    resetSessionStatuses();
+  }
   queue = queue.filter((q) => q.session_date === sessionDate);
   lastSessionDate = sessionDate;
 }
@@ -293,7 +304,34 @@ export const mockStore = {
         q.status !== 'loaded' &&
         q.status !== 'cancelled'
     );
-    if (existing) return existing;
+    if (existing) {
+      const notReady = students.find(
+        (s) => s.family_id === family.id && s.status === 'not_checked_in'
+      );
+      if (notReady) {
+        throw new Error(`${notReady.first_name} must complete morning check-in first`);
+      }
+      students
+        .filter((s) => s.family_id === family.id && s.status === 'in_class')
+        .forEach((s) => {
+          s.status = 'pickup_arrived';
+        });
+      existing.students = students.filter((s) => s.family_id === family.id).map((s) => ({ ...s }));
+      return existing;
+    }
+
+    const notReady = students.find(
+      (s) => s.family_id === family.id && s.status === 'not_checked_in'
+    );
+    if (notReady) {
+      throw new Error(`${notReady.first_name} must complete morning check-in first`);
+    }
+
+    students
+      .filter((s) => s.family_id === family.id && s.status === 'in_class')
+      .forEach((s) => {
+        s.status = 'pickup_arrived';
+      });
 
     const item = buildQueueItem(family, laneNumber);
     queue.push(item);
@@ -311,7 +349,8 @@ export const mockStore = {
     students
       .filter((s) => s.family_id === last.family_id)
       .forEach((s) => {
-        if (s.status === 'staged') s.status = 'in_class';
+        if (s.status === 'pickup_arrived') s.status = 'in_class';
+        if (s.status === 'released_from_class') s.status = 'pickup_arrived';
       });
     return last;
   },
@@ -324,13 +363,6 @@ export const mockStore = {
     item.status = status;
     if (status === 'loaded') item.dismissed_at = new Date().toISOString();
 
-    if (status === 'staged' || status === 'calling') {
-      students
-        .filter((s) => s.family_id === item.family_id)
-        .forEach((s) => {
-          if (s.status !== 'loaded') s.status = 'staged';
-        });
-    }
     if (status === 'loaded') {
       students
         .filter((s) => s.family_id === item.family_id)
@@ -347,14 +379,16 @@ export const mockStore = {
     seedIfEmpty();
     const student = students.find((s) => s.id === studentId);
     if (!student) throw new Error('Student not found');
-    if (student.status !== 'in_class') {
+    if (student.status !== 'pickup_arrived') {
       throw new Error(
         student.status === 'not_checked_in'
-          ? 'Student must be checked in before release from class'
-          : 'Student is not in class'
+          ? 'Student must be checked in and have pickup arrived before release'
+          : student.status === 'in_class'
+            ? 'Pickup must arrive before release from class'
+            : 'Student is not ready to be released from class'
       );
     }
-    student.status = 'staged';
+    student.status = 'released_from_class';
 
     const item = queue.find(
       (q) => q.family_id === student.family_id && q.status !== 'loaded' && q.status !== 'cancelled'
@@ -370,7 +404,7 @@ export const mockStore = {
     seedIfEmpty();
     const student = students.find((s) => s.id === studentId);
     if (!student) throw new Error('Student not found');
-    if (student.status !== 'staged') {
+    if (student.status !== 'released_from_class') {
       throw new Error('Student must be released from class before loading');
     }
     student.status = 'loaded';
@@ -429,6 +463,13 @@ export const mockStore = {
 
     student.status = 'in_class';
     return rosterStudentRow(student);
+  },
+
+  restartSession(_password: string) {
+    seedIfEmpty();
+    resetSessionStatuses();
+    lastSessionDate = today();
+    return { session_date: lastSessionDate, studentsReset: students.filter((s) => s.status !== 'absent').length };
   },
 
   importRoster(rows: RosterImportRow[]) {

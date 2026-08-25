@@ -1,4 +1,10 @@
-export type StudentStatus = 'not_checked_in' | 'in_class' | 'staged' | 'loaded' | 'absent';
+export type StudentStatus =
+  | 'not_checked_in'
+  | 'in_class'
+  | 'pickup_arrived'
+  | 'released_from_class'
+  | 'loaded'
+  | 'absent';
 export type QueueStatus = 'waiting' | 'calling' | 'staged' | 'loaded' | 'cancelled';
 /** Staff roles (Beeline-aligned). */
 export type StaffRole = 'admin' | 'hallmonitor' | 'trafficcontroller';
@@ -81,7 +87,8 @@ export type RealtimeMessage =
   | { type: 'QUEUE_REMOVED'; data: { id: string } }
   | { type: 'SYNC'; data: QueueItem[] }
   | { type: 'ROSTER_SYNCED'; data: { studentsSynced: number; groupsSynced: number } }
-  | { type: 'STUDENT_CHECKED_IN'; data: RosterStudent };
+  | { type: 'STUDENT_CHECKED_IN'; data: RosterStudent }
+  | { type: 'SESSION_RESET'; data: { session_date: string } };
 
 export interface RosterStudent extends Student {
   tag_number: string;

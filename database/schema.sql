@@ -3,7 +3,9 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 DO $$ BEGIN
-  CREATE TYPE student_status_enum AS ENUM ('not_checked_in', 'in_class', 'staged', 'loaded', 'absent');
+  CREATE TYPE student_status_enum AS ENUM (
+    'not_checked_in', 'in_class', 'pickup_arrived', 'released_from_class', 'loaded', 'absent'
+  );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -64,4 +66,6 @@ ALTER TABLE students ADD COLUMN IF NOT EXISTS m365_group_id VARCHAR(100);
 ALTER TABLE students ADD COLUMN IF NOT EXISTS m365_photo_url TEXT;
 ALTER TABLE carpool_queue ADD COLUMN IF NOT EXISTS dismissed_at TIMESTAMPTZ;
 ALTER TYPE student_status_enum ADD VALUE IF NOT EXISTS 'not_checked_in' BEFORE 'in_class';
+ALTER TYPE student_status_enum ADD VALUE IF NOT EXISTS 'pickup_arrived' AFTER 'in_class';
+ALTER TYPE student_status_enum ADD VALUE IF NOT EXISTS 'released_from_class' AFTER 'pickup_arrived';
 ALTER TABLE students ALTER COLUMN status SET DEFAULT 'not_checked_in';

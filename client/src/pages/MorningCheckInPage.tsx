@@ -39,6 +39,9 @@ export default function MorningCheckInPage() {
         if (msg.type === 'STUDENT_CHECKED_IN') {
           setStudents((prev) => prev.map((s) => (s.id === msg.data.id ? { ...s, ...msg.data } : s)));
         }
+        if (msg.type === 'SESSION_RESET') {
+          load();
+        }
       } catch {
         /* ignore */
       }

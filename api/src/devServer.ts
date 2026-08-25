@@ -114,6 +114,17 @@ app.post('/api/students/morning-check-in', async (req, res) => {
   }
 });
 
+app.post('/api/admin/restart-session', async (req, res) => {
+  try {
+    const result = await db.restartSession(String(req.body.password ?? ''));
+    await publish({ type: 'SESSION_RESET', data: { session_date: result.session_date } });
+    await publish({ type: 'SYNC', data: await db.getQueue() });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
 app.post('/api/roster/import', async (req, res) => {
   try {
     const rows = parseCsv(req.body.csv ?? '');

@@ -13,6 +13,14 @@
       "allowedRoles": ["admin", "hallmonitor", "trafficcontroller"]
     },
     {
+      "route": "/admin-settings",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-settings/*",
+      "allowedRoles": ["admin"]
+    },
+    {
       "route": "/admin-pickup-zone",
       "allowedRoles": ["admin"]
     },

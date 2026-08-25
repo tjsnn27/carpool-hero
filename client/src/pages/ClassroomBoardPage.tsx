@@ -34,14 +34,16 @@ function playChime() {
 const statusStyle: Record<string, string> = {
   waiting: 'border-orange-500 bg-orange-50',
   calling: 'border-blue-500 bg-blue-50',
-  staged: 'border-blue-600 bg-blue-50',
+  pickup_arrived: 'border-indigo-500 bg-indigo-50',
+  released_from_class: 'border-blue-600 bg-blue-50',
   loaded: 'border-green-600 bg-green-50',
 };
 
 const studentStatusStyle: Record<string, string> = {
   not_checked_in: 'bg-orange-200 text-orange-900',
   in_class: 'bg-stone-200 text-stone-800',
-  staged: 'bg-blue-200 text-blue-900',
+  pickup_arrived: 'bg-indigo-200 text-indigo-900',
+  released_from_class: 'bg-blue-200 text-blue-900',
   loaded: 'bg-green-200 text-green-900',
   absent: 'bg-stone-100 text-stone-500',
 };
@@ -165,7 +167,7 @@ export default function ClassroomBoardPage() {
                         <span className={`text-xs font-black px-2 py-1 rounded-lg whitespace-nowrap ${studentStatusStyle[s.status] ?? studentStatusStyle.in_class}`}>
                           {studentStatusLabel(s.status)}
                         </span>
-                        {s.status === 'in_class' && (
+                        {s.status === 'pickup_arrived' && (
                           <button
                             onClick={() => releaseStudent(item, s.id)}
                             className="px-3 py-1.5 bg-blue-600 text-white rounded-lg font-bold text-xs border-2 border-stone-900 whitespace-nowrap"

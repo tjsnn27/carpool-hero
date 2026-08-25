@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { Car, ClipboardList, LogIn, MapPin, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
+import { Car, ClipboardList, LogIn, MapPin, Settings, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from './auth/AuthProvider';
 import { RoleGate } from './components/RoleGate';
 import { useRealtime } from './hooks/useRealtime';
@@ -8,7 +8,9 @@ import ClassroomBoardPage from './pages/ClassroomBoardPage';
 import AdminRosterPage from './pages/AdminRosterPage';
 import AdminTagsPage from './pages/AdminTagsPage';
 import AdminPickupZonePage from './pages/AdminPickupZonePage';
+import AdminSettingsPage from './pages/AdminSettingsPage';
 import MorningCheckInPage from './pages/MorningCheckInPage';
+import { AdminPasswordGate } from './auth/AdminPasswordGate';
 import type { StaffRole } from './types';
 import { STAFF_ROLE_LABELS } from './types';
 
@@ -19,6 +21,7 @@ const nav: { to: string; label: string; icon: typeof Car; roles?: StaffRole[] }[
   { to: '/admin-roster', label: 'Roster', icon: Shield, roles: ['admin'] },
   { to: '/admin-tags', label: 'Tags', icon: Tag, roles: ['admin'] },
   { to: '/admin-pickup-zone', label: 'Zone', icon: MapPin, roles: ['admin'] },
+  { to: '/admin-settings', label: 'Admin', icon: Settings, roles: ['admin'] },
 ];
 
 function HomeRedirect() {
@@ -35,7 +38,7 @@ function HomeRedirect() {
 const MOCK_ROLES: StaffRole[] = ['admin', 'trafficcontroller', 'hallmonitor'];
 
 export default function App() {
-  const { mockAuth, setMockRole, mockRole, hasRole, login, logout, isAuthenticated } = useAuth();
+  const { mockAuth, setMockRole, mockRole, hasRole, adminUnlocked, login, logout, isAuthenticated } = useAuth();
   const { connected, mockMode } = useRealtime();
 
   return (
@@ -81,6 +84,12 @@ export default function App() {
       <nav className="bg-white border-b-4 border-stone-900 px-2 py-1 flex gap-1 overflow-x-auto sticky top-[4.5rem] z-40">
         {nav
           .filter((n) => n.roles && n.roles.some((r) => hasRole(r)))
+          .filter((n) => {
+            const isAdminOnly = n.roles?.length === 1 && n.roles[0] === 'admin';
+            if (!isAdminOnly) return true;
+            if (n.to === '/admin-settings') return true;
+            return adminUnlocked;
+          })
           .map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -132,7 +141,9 @@ export default function App() {
             path="/admin-roster"
             element={
               <RoleGate roles={['admin']}>
-                <AdminRosterPage />
+                <AdminPasswordGate>
+                  <AdminRosterPage />
+                </AdminPasswordGate>
               </RoleGate>
             }
           />
@@ -140,7 +151,9 @@ export default function App() {
             path="/admin-tags"
             element={
               <RoleGate roles={['admin']}>
-                <AdminTagsPage />
+                <AdminPasswordGate>
+                  <AdminTagsPage />
+                </AdminPasswordGate>
               </RoleGate>
             }
           />
@@ -148,7 +161,19 @@ export default function App() {
             path="/admin-pickup-zone"
             element={
               <RoleGate roles={['admin']}>
-                <AdminPickupZonePage />
+                <AdminPasswordGate>
+                  <AdminPickupZonePage />
+                </AdminPasswordGate>
+              </RoleGate>
+            }
+          />
+          <Route
+            path="/admin-settings"
+            element={
+              <RoleGate roles={['admin']}>
+                <AdminPasswordGate>
+                  <AdminSettingsPage />
+                </AdminPasswordGate>
               </RoleGate>
             }
           />

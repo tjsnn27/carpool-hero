@@ -167,6 +167,27 @@ app.http('studentsMorningCheckIn', {
   },
 });
 
+app.http('adminRestartSession', {
+  methods: ['POST', 'OPTIONS'],
+  authLevel: 'anonymous',
+  route: 'admin/restart-session',
+  handler: async (req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    if (req.method === 'OPTIONS') {
+      return { status: 204, headers: corsHeaders() };
+    }
+    try {
+      const body = (await req.json()) as { password?: string };
+      const password = String(body.password ?? '');
+      const result = await db.restartSession(password);
+      await publish({ type: 'SESSION_RESET', data: { session_date: result.session_date } });
+      await publish({ type: 'SYNC', data: await db.getQueue() });
+      return { status: 200, jsonBody: result, headers: corsHeaders() };
+    } catch (err) {
+      return { status: 400, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
+    }
+  },
+});
+
 app.http('rosterImport', {
   methods: ['POST', 'OPTIONS'],
   authLevel: 'anonymous',

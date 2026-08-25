@@ -53,6 +53,12 @@ export const api = {
       body: JSON.stringify({ student_id }),
     }),
 
+  restartSession: (password: string) =>
+    request<{ session_date: string; studentsReset: number }>('/admin/restart-session', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+
   negotiate: () => request<{ url: string } | { mock: true }>('/negotiate'),
 
   getRoster: () => request<RosterData>('/roster'),

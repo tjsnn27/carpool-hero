@@ -1,9 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { MsalProvider, useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { isMockAuth, loginRequest, msalConfig } from './msalConfig';
 import { api } from '../lib/api';
 import type { AppRole, StaffRole } from '../types';
+
+const ADMIN_PASSWORD = '10205';
+const ADMIN_UNLOCK_KEY = 'carpool_admin_unlocked';
 
 function hasStaffRole(active: AppRole, required: StaffRole): boolean {
   return active === 'admin' || active === required;
@@ -19,9 +22,12 @@ interface AuthContextValue {
   roles: AppRole[];
   mockRole: StaffRole;
   rosterGradeRooms: string[];
+  adminUnlocked: boolean;
   hasRole: (role: StaffRole) => boolean;
   mockAuth: boolean;
   setMockRole: (role: StaffRole) => void;
+  unlockAdmin: (password: string) => boolean;
+  lockAdmin: () => void;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -41,13 +47,39 @@ function loadRosterGrades(): Promise<string[]> {
     .catch(() => []);
 }
 
+function useAdminUnlock() {
+  const [adminUnlocked, setAdminUnlocked] = useState(
+    () => sessionStorage.getItem(ADMIN_UNLOCK_KEY) === '1'
+  );
+
+  const unlockAdmin = useCallback((password: string) => {
+    if (password !== ADMIN_PASSWORD) return false;
+    sessionStorage.setItem(ADMIN_UNLOCK_KEY, '1');
+    setAdminUnlocked(true);
+    return true;
+  }, []);
+
+  const lockAdmin = useCallback(() => {
+    sessionStorage.removeItem(ADMIN_UNLOCK_KEY);
+    setAdminUnlocked(false);
+  }, []);
+
+  return { adminUnlocked, unlockAdmin, lockAdmin };
+}
+
 function MockAuthProvider({ children }: { children: ReactNode }) {
-  const [mockRole, setMockRole] = useState<StaffRole>('admin');
+  const [mockRole, setMockRoleState] = useState<StaffRole>('hallmonitor');
   const [rosterGradeRooms, setRosterGradeRooms] = useState<string[]>([]);
+  const { adminUnlocked, unlockAdmin, lockAdmin } = useAdminUnlock();
 
   useEffect(() => {
     loadRosterGrades().then(setRosterGradeRooms);
   }, []);
+
+  const setMockRole = (role: StaffRole) => {
+    setMockRoleState(role);
+    if (role !== 'admin') lockAdmin();
+  };
 
   const refreshRosterGrades = async () => {
     setRosterGradeRooms(await loadRosterGrades());
@@ -59,9 +91,12 @@ function MockAuthProvider({ children }: { children: ReactNode }) {
         roles: [mockRole],
         mockRole,
         rosterGradeRooms,
+        adminUnlocked,
         hasRole: (r) => hasStaffRole(mockRole, r),
         mockAuth: true,
         setMockRole,
+        unlockAdmin,
+        lockAdmin,
         login: async () => {},
         logout: async () => {},
         isAuthenticated: true,
@@ -77,6 +112,7 @@ function MsalAuthInner({ children }: { children: ReactNode }) {
   const { instance, accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const [rosterGradeRooms, setRosterGradeRooms] = useState<string[]>([]);
+  const { adminUnlocked, unlockAdmin, lockAdmin } = useAdminUnlock();
 
   const roles: AppRole[] = (accounts[0]?.idTokenClaims?.roles as AppRole[]) ?? [];
 
@@ -94,7 +130,7 @@ function MsalAuthInner({ children }: { children: ReactNode }) {
       ? 'hallmonitor'
       : roles.includes('trafficcontroller')
         ? 'trafficcontroller'
-        : 'admin';
+        : 'hallmonitor';
 
   return (
     <AuthContext.Provider
@@ -102,13 +138,17 @@ function MsalAuthInner({ children }: { children: ReactNode }) {
         roles,
         mockRole,
         rosterGradeRooms,
+        adminUnlocked,
         hasRole: (r) => roles.some((active) => hasAnyStaffRole([active], r)),
         mockAuth: false,
         setMockRole: () => {},
+        unlockAdmin,
+        lockAdmin,
         login: async () => {
           await instance.loginRedirect(loginRequest);
         },
         logout: async () => {
+          lockAdmin();
           await instance.logoutRedirect();
         },
         isAuthenticated,

@@ -207,7 +207,7 @@ export default function LaneScannerPage() {
                       <p className="font-bold text-stone-900">{s.first_name} {s.last_name}</p>
                       <p className="text-xs font-bold text-stone-600 whitespace-nowrap">{studentStatusLabel(s.status)}</p>
                     </div>
-                    {s.status === 'staged' && (
+                    {s.status === 'released_from_class' && (
                       <button
                         disabled={loadingStudentId === s.id}
                         onClick={() => markLoaded(item, s.id)}
