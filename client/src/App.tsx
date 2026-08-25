@@ -9,30 +9,31 @@ import AdminRosterPage from './pages/AdminRosterPage';
 import AdminTagsPage from './pages/AdminTagsPage';
 import AdminPickupZonePage from './pages/AdminPickupZonePage';
 import type { StaffRole } from './types';
-import { STAFF_ROLE_LABELS, teacherPersonaValue } from './types';
+import { STAFF_ROLE_LABELS } from './types';
 
 const nav: { to: string; label: string; icon: typeof Car; roles?: StaffRole[] }[] = [
-  { to: '/lane-scanner', label: 'Traffic Control', icon: Car, roles: ['trafficcontroller', 'dispatcher'] },
-  { to: '/classroom-board', label: 'Board', icon: ClipboardList, roles: ['teacher', 'dispatcher'] },
-  { to: '/admin-roster', label: 'Roster', icon: Shield, roles: ['dispatcher'] },
-  { to: '/admin-tags', label: 'Tags', icon: Tag, roles: ['dispatcher'] },
-  { to: '/admin-pickup-zone', label: 'Zone', icon: MapPin, roles: ['dispatcher'] },
+  { to: '/lane-scanner', label: 'Traffic Control', icon: Car, roles: ['trafficcontroller', 'admin'] },
+  { to: '/classroom-board', label: 'Board', icon: ClipboardList, roles: ['hallmonitor', 'admin'] },
+  { to: '/admin-roster', label: 'Roster', icon: Shield, roles: ['admin'] },
+  { to: '/admin-tags', label: 'Tags', icon: Tag, roles: ['admin'] },
+  { to: '/admin-pickup-zone', label: 'Zone', icon: MapPin, roles: ['admin'] },
 ];
 
 function HomeRedirect() {
   const { hasRole } = useAuth();
-  if (hasRole('trafficcontroller') && !hasRole('dispatcher')) {
+  if (hasRole('trafficcontroller') && !hasRole('admin')) {
     return <Navigate to="/lane-scanner" replace />;
   }
-  if (hasRole('teacher') && !hasRole('dispatcher')) {
+  if (hasRole('hallmonitor') && !hasRole('admin')) {
     return <Navigate to="/classroom-board" replace />;
   }
   return <Navigate to="/classroom-board" replace />;
 }
 
+const MOCK_ROLES: StaffRole[] = ['admin', 'trafficcontroller', 'hallmonitor'];
+
 export default function App() {
-  const { mockAuth, setMockPersona, mockPersona, rosterGradeRooms, hasRole, login, logout, isAuthenticated } =
-    useAuth();
+  const { mockAuth, setMockRole, mockRole, hasRole, login, logout, isAuthenticated } = useAuth();
   const { connected, mockMode } = useRealtime();
 
   return (
@@ -51,16 +52,14 @@ export default function App() {
             <span className="text-xs font-bold hidden sm:inline">{mockMode ? 'Mock' : 'Live'}</span>
             {mockAuth ? (
               <select
-                value={mockPersona}
-                onChange={(e) => setMockPersona(e.target.value)}
+                value={mockRole}
+                onChange={(e) => setMockRole(e.target.value as StaffRole)}
                 className="text-xs bg-brand-800 border border-brand-500 rounded-lg px-2 py-1 text-white max-w-[11rem]"
                 aria-label="View as"
               >
-                <option value="dispatcher">{STAFF_ROLE_LABELS.dispatcher}</option>
-                <option value="trafficcontroller">{STAFF_ROLE_LABELS.trafficcontroller}</option>
-                {rosterGradeRooms.map((grade) => (
-                  <option key={grade} value={teacherPersonaValue(grade)}>
-                    Teacher {grade}
+                {MOCK_ROLES.map((role) => (
+                  <option key={role} value={role}>
+                    {STAFF_ROLE_LABELS[role]}
                   </option>
                 ))}
               </select>
@@ -106,7 +105,7 @@ export default function App() {
           <Route
             path="/lane-scanner"
             element={
-              <RoleGate roles={['trafficcontroller', 'dispatcher']}>
+              <RoleGate roles={['trafficcontroller', 'admin']}>
                 <LaneScannerPage />
               </RoleGate>
             }
@@ -114,7 +113,7 @@ export default function App() {
           <Route
             path="/classroom-board"
             element={
-              <RoleGate roles={['teacher', 'dispatcher']}>
+              <RoleGate roles={['hallmonitor', 'admin']}>
                 <ClassroomBoardPage />
               </RoleGate>
             }
@@ -122,7 +121,7 @@ export default function App() {
           <Route
             path="/admin-roster"
             element={
-              <RoleGate roles={['dispatcher']}>
+              <RoleGate roles={['admin']}>
                 <AdminRosterPage />
               </RoleGate>
             }
@@ -130,7 +129,7 @@ export default function App() {
           <Route
             path="/admin-tags"
             element={
-              <RoleGate roles={['dispatcher']}>
+              <RoleGate roles={['admin']}>
                 <AdminTagsPage />
               </RoleGate>
             }
@@ -138,7 +137,7 @@ export default function App() {
           <Route
             path="/admin-pickup-zone"
             element={
-              <RoleGate roles={['dispatcher']}>
+              <RoleGate roles={['admin']}>
                 <AdminPickupZonePage />
               </RoleGate>
             }

@@ -16,6 +16,7 @@ import type {
 } from './types';
 import { today } from './types';
 import { lastNameFromFamily, parseCsv } from './csvParser';
+import { normalizePickupLocation } from './pickupLocations';
 import { assertValidTagNumber } from './tagNumber';
 import { STARTUP_ROSTER_CSV } from './startupRoster';
 
@@ -261,6 +262,7 @@ export const mockStore = {
 
   checkIn(tagNumber: string, laneNumber = 1): QueueItem {
     tagNumber = assertValidTagNumber(tagNumber);
+    laneNumber = normalizePickupLocation(laneNumber);
     seedIfEmpty();
     const family = families.find((f) => f.tag_number === tagNumber);
     if (!family) throw new Error(`No family found for Student ID ${tagNumber}`);

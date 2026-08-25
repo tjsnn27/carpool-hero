@@ -4,6 +4,7 @@ import { isMockMode, today } from './types';
 import { mockStore } from './mockStore';
 import { fetchClassGroups } from './graph';
 import { lastNameFromFamily } from './csvParser';
+import { normalizePickupLocation } from './pickupLocations';
 import { assertValidTagNumber } from './tagNumber';
 
 let pool: Pool | null = null;
@@ -62,6 +63,7 @@ export const db = {
 
   async checkIn(tagNumber: string, laneNumber = 1): Promise<QueueItem> {
     tagNumber = assertValidTagNumber(tagNumber);
+    laneNumber = normalizePickupLocation(laneNumber);
     if (isMockMode()) return mockStore.checkIn(tagNumber, laneNumber);
 
     const client = await getPool().connect();

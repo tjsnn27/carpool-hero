@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../lib/api';
-import { useAuth } from '../auth/AuthProvider';
 import { useRealtime } from '../hooks/useRealtime';
+import { pickupLocationLabel } from '../lib/pickupLocations';
 import { studentStatusLabel } from '../lib/statusLabels';
 import type { QueueItem } from '../types';
 
@@ -47,23 +47,10 @@ const studentStatusStyle: Record<string, string> = {
 
 export default function ClassroomBoardPage() {
   const { queue, connected, applyMessage } = useRealtime();
-  const { teacherGradeRooms, activeTeacherGrade, hasRole } = useAuth();
   const [gradeFilter, setGradeFilter] = useState('');
   const [tts, setTts] = useState(false);
   const [chime, setChime] = useState(true);
   const prevIds = useRef<Set<string>>(new Set());
-
-  const teacherLocked = !!activeTeacherGrade;
-
-  useEffect(() => {
-    if (activeTeacherGrade) {
-      setGradeFilter(activeTeacherGrade);
-      return;
-    }
-    if (teacherGradeRooms.length === 1 && hasRole('teacher') && !hasRole('dispatcher')) {
-      setGradeFilter(teacherGradeRooms[0]);
-    }
-  }, [activeTeacherGrade, teacherGradeRooms, hasRole]);
 
   const grades = useMemo(() => {
     const set = new Set<string>();
@@ -85,7 +72,7 @@ export default function ClassroomBoardPage() {
             .filter((s) => !gradeFilter || s.grade_room === gradeFilter)
             .map((s) => `${s.first_name} ${s.last_name}`)
             .join(', ');
-          if (names) speak(`${names}. Student ID ${item.tag_number}.`);
+          if (names) speak(`${names}. Student ID ${item.tag_number}. ${pickupLocationLabel(item.lane_number)}.`);
         }
       }
     }
@@ -105,25 +92,16 @@ export default function ClassroomBoardPage() {
           <p className={`text-sm font-bold ${connected ? 'text-green-700' : 'text-red-600'}`}>
             {connected ? '● Live updates' : '○ Reconnecting…'}
           </p>
-          {activeTeacherGrade && (
-            <p className="text-xs font-bold text-brand-700 mt-1">Viewing: {activeTeacherGrade}</p>
-          )}
-          {!activeTeacherGrade && teacherGradeRooms.length > 0 && (
-            <p className="text-xs font-bold text-brand-700 mt-1">
-              Your class{teacherGradeRooms.length > 1 ? 'es' : ''}: {teacherGradeRooms.join(', ')}
-            </p>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={gradeFilter}
             onChange={(e) => setGradeFilter(e.target.value)}
-            disabled={teacherLocked}
-            className="border-2 border-stone-900 rounded-xl px-4 py-2 font-bold bg-white disabled:opacity-70"
+            className="border-2 border-stone-900 rounded-xl px-4 py-2 font-bold bg-white"
             aria-label="Filter by grade"
           >
-            {!teacherLocked && <option value="">All Grades</option>}
-            {(teacherLocked ? [activeTeacherGrade!] : grades).map((g) => (
+            <option value="">All Grades</option>
+            {grades.map((g) => (
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
@@ -152,14 +130,17 @@ export default function ClassroomBoardPage() {
               key={item.id}
               className={`rounded-2xl border-4 p-4 shadow-[3px_3px_0_#1c1917] ${statusStyle[item.status] ?? statusStyle.waiting}`}
             >
-              <div className="flex justify-between items-start mb-3">
+              <div className="flex justify-between items-start mb-3 gap-2">
                 <div>
                   <p className="text-xs font-bold uppercase text-stone-600">Student ID</p>
                   <span className="text-4xl font-black text-brand-700">#{item.tag_number}</span>
                 </div>
-                <span className="text-xs font-black uppercase px-2 py-1 rounded-lg bg-white border-2 border-stone-900">
-                  {item.status}
-                </span>
+                <div className="text-right">
+                  <p className="text-xs font-bold uppercase text-stone-600">Pickup</p>
+                  <span className="text-sm font-black text-stone-900 whitespace-nowrap">
+                    {pickupLocationLabel(item.lane_number)}
+                  </span>
+                </div>
               </div>
               <p className="text-xl font-black text-stone-900 mb-2">{item.family_name}</p>
 

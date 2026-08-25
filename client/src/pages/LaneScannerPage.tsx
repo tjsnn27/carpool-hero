@@ -4,6 +4,7 @@ import { Camera, Delete, Undo2, Check } from 'lucide-react';
 import { api } from '../lib/api';
 import { useRealtime } from '../hooks/useRealtime';
 import { studentStatusLabel } from '../lib/statusLabels';
+import { PICKUP_LOCATIONS, pickupLocationLabel } from '../lib/pickupLocations';
 import type { QueueItem } from '../types';
 import { TAG_NUMBER_MAX_LENGTH } from '../types';
 
@@ -126,11 +127,11 @@ export default function LaneScannerPage() {
           <select
             value={lane}
             onChange={(e) => setLane(Number(e.target.value))}
-            className="bg-white border-2 border-stone-900 rounded-xl px-3 py-2 font-bold text-stone-900"
-            aria-label="Lane number"
+            className="bg-white border-2 border-stone-900 rounded-xl px-3 py-2 font-bold text-stone-900 max-w-[10rem]"
+            aria-label="Pickup location"
           >
-            {[1, 2, 3].map((n) => (
-              <option key={n} value={n}>Lane {n}</option>
+            {PICKUP_LOCATIONS.map((loc) => (
+              <option key={loc.id} value={loc.id}>{loc.label}</option>
             ))}
           </select>
           <button
@@ -192,9 +193,12 @@ export default function LaneScannerPage() {
           <h2 className="font-black text-stone-900">Active pickups</h2>
           {activeQueue.map((item) => (
             <div key={item.id} className="border-2 border-stone-800 rounded-xl p-3">
-              <div className="flex justify-between items-baseline mb-2">
+              <div className="flex justify-between items-baseline mb-2 gap-2">
                 <span className="text-2xl font-black text-brand-700">ID {item.tag_number}</span>
-                <span className="font-bold text-stone-800">{item.family_name}</span>
+                <div className="text-right">
+                  <span className="font-bold text-stone-800 block">{item.family_name}</span>
+                  <span className="text-xs font-bold text-stone-600">{pickupLocationLabel(item.lane_number)}</span>
+                </div>
               </div>
               <ul className="space-y-2">
                 {item.students.map((s) => (

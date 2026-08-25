@@ -210,7 +210,7 @@ app.post('/api/queue/arrive', async (req, res) => {
 });
 
 app.get('/api/GetRoles', (_req, res) => {
-  res.json({ roles: ['dispatcher'] });
+  res.json({ roles: ['admin'] });
 });
 
 app.get('/api/events', (req, res) => {
