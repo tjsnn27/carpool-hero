@@ -1,5 +1,5 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { Car, ClipboardList, LogIn, MapPin, Settings, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
+import { NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
+import { Car, ClipboardList, Lock, LogIn, MapPin, Settings, Shield, Tag, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from './auth/AuthProvider';
 import { RoleGate } from './components/RoleGate';
 import { useRealtime } from './hooks/useRealtime';
@@ -25,7 +25,10 @@ const nav: { to: string; label: string; icon: typeof Car; roles?: StaffRole[] }[
 ];
 
 function HomeRedirect() {
-  const { hasRole } = useAuth();
+  const { hasRole, adminUnlocked } = useAuth();
+  if (hasRole('admin') && !adminUnlocked) {
+    return <Navigate to="/admin-settings" replace />;
+  }
   if (hasRole('trafficcontroller') && !hasRole('admin')) {
     return <Navigate to="/lane-scanner" replace />;
   }
@@ -38,8 +41,12 @@ function HomeRedirect() {
 const MOCK_ROLES: StaffRole[] = ['admin', 'trafficcontroller', 'hallmonitor'];
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { mockAuth, setMockRole, mockRole, hasRole, adminUnlocked, login, logout, isAuthenticated } = useAuth();
   const { connected, mockMode } = useRealtime();
+
+  const showAdminLoginHint = hasRole('admin') && !adminUnlocked && location.pathname !== '/admin-settings';
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
@@ -58,7 +65,11 @@ export default function App() {
             {mockAuth ? (
               <select
                 value={mockRole}
-                onChange={(e) => setMockRole(e.target.value as StaffRole)}
+                onChange={(e) => {
+                  const role = e.target.value as StaffRole;
+                  setMockRole(role);
+                  if (role === 'admin') navigate('/admin-settings');
+                }}
                 className="text-xs bg-brand-800 border border-brand-500 rounded-lg px-2 py-1 text-white max-w-[11rem]"
                 aria-label="View as"
               >
@@ -90,23 +101,49 @@ export default function App() {
             if (n.to === '/admin-settings') return true;
             return adminUnlocked;
           })
-          .map(({ to, label, icon: Icon }) => (
+          .map(({ to, label, icon: Icon }) => {
+            const isAdminLogin = to === '/admin-settings' && !adminUnlocked;
+            const NavIcon = isAdminLogin ? Lock : Icon;
+            const navLabel = isAdminLogin ? 'Admin Login' : label;
+            return (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 `flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-black whitespace-nowrap border-2 ${
                   isActive
-                    ? 'bg-brand-600 text-white border-stone-900 shadow-[2px_2px_0_#1c1917]'
-                    : 'bg-amber-50 text-stone-800 border-transparent hover:border-stone-400'
+                    ? isAdminLogin
+                      ? 'bg-amber-500 text-stone-900 border-stone-900 shadow-[2px_2px_0_#1c1917]'
+                      : 'bg-brand-600 text-white border-stone-900 shadow-[2px_2px_0_#1c1917]'
+                    : isAdminLogin
+                      ? 'bg-amber-100 text-stone-900 border-amber-600 hover:border-stone-900'
+                      : 'bg-amber-50 text-stone-800 border-transparent hover:border-stone-400'
                 }`
               }
             >
-              <Icon size={18} strokeWidth={2.5} />
-              {label}
+              <NavIcon size={18} strokeWidth={2.5} />
+              {navLabel}
             </NavLink>
-          ))}
+            );
+          })}
       </nav>
+
+      {showAdminLoginHint && (
+        <div className="bg-amber-100 border-b-4 border-amber-600 px-4 py-3">
+          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-bold text-amber-950">
+              Admin tools are locked. Tap <strong>Admin Login</strong> in the menu and enter the password.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/admin-settings')}
+              className="px-4 py-2 bg-brand-600 text-white rounded-xl font-black text-sm border-2 border-stone-900"
+            >
+              Go to Admin Login
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 p-4 max-w-6xl mx-auto w-full">
         <Routes>

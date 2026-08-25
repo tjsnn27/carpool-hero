@@ -22,9 +22,9 @@ export function AdminPasswordGate({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-6">
       <Lock className="text-brand-700" size={40} />
-      <h2 className="text-xl font-black text-stone-900">Admin Access</h2>
+      <h2 className="text-xl font-black text-stone-900">Admin Login</h2>
       <p className="text-sm font-bold text-stone-600 text-center max-w-sm">
-        Enter the admin password to open roster, tags, zone, and session controls.
+        Enter the admin password (5 digits) to unlock Roster, Tags, Zone, and Sunday session restart.
       </p>
       <form onSubmit={submit} className="w-full max-w-xs space-y-3">
         <input
@@ -32,7 +32,7 @@ export function AdminPasswordGate({ children }: { children: ReactNode }) {
           inputMode="numeric"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
+          placeholder="Enter password"
           className="w-full border-3 border-stone-900 rounded-xl px-4 py-3 font-bold text-center text-lg"
           autoComplete="current-password"
         />
