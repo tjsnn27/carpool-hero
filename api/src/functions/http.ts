@@ -141,6 +141,58 @@ app.http('rosterGet', {
   },
 });
 
+app.http('rosterExport', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'roster/export',
+  handler: async (req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    try {
+      const format = (req.query.get('format') ?? 'csv').toLowerCase();
+      const roster = await db.getRoster();
+      const rows = roster.students.map((s: any) => ({
+        StudentID: s.tag_number ?? '',
+        FirstName: s.first_name ?? '',
+        LastName: s.last_name ?? '',
+        Grade: s.grade_room ?? '',
+        Family: s.family_name ?? '',
+        Status: s.status ?? '',
+      }));
+
+      if (format === 'xlsx') {
+        const xlsx = await import('xlsx');
+        const ws = xlsx.utils.json_to_sheet(rows);
+        const wb = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(wb, ws, 'Attendance');
+        const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        return {
+          status: 200,
+          body: buf,
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.xlsx"`,
+            'Access-Control-Allow-Origin': '*',
+          },
+        };
+      }
+
+      // default: csv
+      const keys = rows.length > 0 ? Object.keys(rows[0]) : ['StudentID', 'FirstName', 'LastName', 'Grade', 'Family', 'Status'];
+      const escape = (v: any) => {
+        if (v == null) return '';
+        const s = String(v);
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const lines = [keys.join(',')];
+      for (const r of rows) lines.push(keys.map((k) => escape((r as any)[k])).join(','));
+      const csv = lines.join('\n');
+      const buf = Buffer.from(csv, 'utf-8');
+      return { status: 200, body: buf, headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.csv"`, 'Access-Control-Allow-Origin': '*' } };
+    } catch (err) {
+      return { status: 500, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
+    }
+  },
+});
+
 app.http('studentsMorningCheckIn', {
   methods: ['POST', 'OPTIONS'],
   authLevel: 'anonymous',

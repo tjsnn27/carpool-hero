@@ -117,10 +117,17 @@ export default function MorningCheckInPage() {
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8">
       <div>
-        <h1 className="text-2xl font-black text-stone-900">Morning Check-In</h1>
-        <p className="text-sm font-bold text-stone-600 mt-1">
-          {checkedInCount} checked in · {students.length - checkedInCount} not checked in
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-stone-900">Morning Check-In</h1>
+            <p className="text-sm font-bold text-stone-600 mt-1">
+              {checkedInCount} checked in · {students.length - checkedInCount} not checked in
+            </p>
+          </div>
+          <div className="flex gap-2 mt-1">
+            <ExportButtons />
+          </div>
+        </div>
       </div>
 
       {feedback && (
@@ -214,5 +221,47 @@ export default function MorningCheckInPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function ExportButtons() {
+  const [busy, setBusy] = useState(false);
+
+  const doDownload = async (format: 'csv' | 'xlsx') => {
+    try {
+      setBusy(true);
+      const { blob, filename } = await api.exportAttendance(format);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => doDownload('csv')}
+        disabled={busy}
+        className="px-3 py-1 bg-stone-200 rounded-lg font-bold border-2 border-stone-900"
+      >
+        Export CSV
+      </button>
+      <button
+        onClick={() => doDownload('xlsx')}
+        disabled={busy}
+        className="px-3 py-1 bg-stone-200 rounded-lg font-bold border-2 border-stone-900"
+      >
+        Export Excel
+      </button>
+    </>
   );
 }

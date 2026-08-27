@@ -97,6 +97,48 @@ app.get('/api/roster', async (_req, res) => {
   }
 });
 
+app.get('/api/roster/export', async (req, res) => {
+  try {
+    const format = String(req.query.format ?? 'csv').toLowerCase();
+    const roster = await db.getRoster();
+    const rows = roster.students.map((s: any) => ({
+      StudentID: s.tag_number ?? '',
+      FirstName: s.first_name ?? '',
+      LastName: s.last_name ?? '',
+      Grade: s.grade_room ?? '',
+      Family: s.family_name ?? '',
+      Status: s.status ?? '',
+    }));
+
+    if (format === 'xlsx') {
+      const xlsx = await import('xlsx');
+      const ws = xlsx.utils.json_to_sheet(rows);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, 'Attendance');
+      const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.xlsx"`);
+      res.send(buf);
+      return;
+    }
+
+    const keys = rows.length > 0 ? Object.keys(rows[0]) : ['StudentID', 'FirstName', 'LastName', 'Grade', 'Family', 'Status'];
+    const escapeVal = (v: any) => {
+      if (v == null) return '';
+      const s = String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const lines = [keys.join(',')];
+    for (const r of rows) lines.push(keys.map((k) => escapeVal((r as any)[k])).join(','));
+    const csv = lines.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(Buffer.from(csv, 'utf-8'));
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
 app.post('/api/students/morning-check-in', async (req, res) => {
   try {
     let student;

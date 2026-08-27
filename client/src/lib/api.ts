@@ -63,6 +63,26 @@ export const api = {
 
   getRoster: () => request<RosterData>('/roster'),
 
+  exportAttendance: async (format: 'csv' | 'xlsx' = 'csv') => {
+    const res = await fetch(`${BASE}/roster/export?format=${format}`, { method: 'GET' });
+    if (!res.ok) {
+      let err = 'Export failed';
+      try {
+        const body = await res.json();
+        err = body.error ?? err;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(err);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || res.headers.get('content-disposition') || '';
+    let filename = `attendance.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    const m = /filename\s*=\s*"?([^";]+)"?/i.exec(disposition);
+    if (m) filename = m[1];
+    return { blob, filename };
+  },
+
   importCsv: (csv: string) =>
     request<{ familiesCreated: number; studentsCreated: number; studentsUpdated: number; rowsProcessed: number }>(
       '/roster/import',
