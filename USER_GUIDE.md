@@ -163,6 +163,15 @@ The app also **auto-resets on the first use each Sunday**.
 
 Use this at the start of dismissal day or if you need to clear a practice run.
 
+### Export attendance (save today's attendance)
+
+- Open **Morning Check-In**.
+- In the top-right click **Export CSV** or **Export Excel** to download today's attendance snapshot.
+- Files are named `attendance-YYYY-MM-DD.csv` or `attendance-YYYY-MM-DD.xlsx`.
+- Columns included: **StudentID**, **FirstName**, **LastName**, **Grade**, **Family**, **Status** (status values: `not_checked_in`, `in_class`, `pickup_arrived`, `released_from_class`, `loaded`, `absent`).
+- CSV is a plain, comma-quoted file; Excel is a single-sheet `.xlsx` workbook named **Attendance**.
+- Recommended: download and store the file for your records at the end of the morning check-in period or before dismissal, so you have a preserved copy of which students attended that day.
+
 ---
 
 ## Quick reference by role

@@ -53,4 +53,5 @@ export const STARTUP_ROSTER_CSV = `StudentID,StudentFirstName,FamilyName,GradeRo
 10069,Amara,N,Pre-KG (Tamil)
 10070,Maghilini,A,Grade 3(Tamil)
 10071,Ishaan,V,Pre-KG (Tamil)
-10072,Surabhi,S,Grade 1(Tamil)`;
+10072,Surabhi,S,Grade 1(Tamil)
+10073,Abhirami,B,Grade 3(Tamil)`;
