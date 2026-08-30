@@ -5,56 +5,60 @@
   },
   "routes": [
     {
-      "route": "/driver-pickup",
-      "allowedRoles": ["anonymous", "authenticated", "driver"]
+      "route": "/morning-check-in",
+      "allowedRoles": ["admin", "hallmonitor", "trafficcontroller"]
     },
     {
-      "route": "/driver-pickup/*",
-      "allowedRoles": ["anonymous", "authenticated", "driver"]
+      "route": "/morning-check-in/*",
+      "allowedRoles": ["admin", "hallmonitor", "trafficcontroller"]
     },
     {
-      "route": "/faq",
-      "allowedRoles": ["anonymous", "authenticated"]
+      "route": "/admin-settings",
+      "allowedRoles": ["admin"]
+    },
+    {
+      "route": "/admin-settings/*",
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/admin-pickup-zone",
-      "allowedRoles": ["dispatcher"]
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/admin-pickup-zone/*",
-      "allowedRoles": ["dispatcher"]
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/admin-tags",
-      "allowedRoles": ["dispatcher"]
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/admin-tags/*",
-      "allowedRoles": ["dispatcher"]
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/admin-roster",
-      "allowedRoles": ["dispatcher"]
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/admin-roster/*",
-      "allowedRoles": ["dispatcher"]
+      "allowedRoles": ["admin"]
     },
     {
       "route": "/classroom-board",
-      "allowedRoles": ["dispatcher", "teacher"]
+      "allowedRoles": ["admin", "hallmonitor"]
     },
     {
       "route": "/classroom-board/*",
-      "allowedRoles": ["dispatcher", "teacher"]
+      "allowedRoles": ["admin", "hallmonitor"]
     },
     {
       "route": "/lane-scanner",
-      "allowedRoles": ["dispatcher", "trafficcontroller"]
+      "allowedRoles": ["admin", "trafficcontroller"]
     },
     {
       "route": "/lane-scanner/*",
-      "allowedRoles": ["dispatcher", "trafficcontroller"]
+      "allowedRoles": ["admin", "trafficcontroller"]
     },
     {
       "route": "/api/*",

@@ -1,4 +1,10 @@
-export type StudentStatus = 'in_class' | 'staged' | 'loaded' | 'absent';
+export type StudentStatus =
+  | 'not_checked_in'
+  | 'in_class'
+  | 'pickup_arrived'
+  | 'released_from_class'
+  | 'loaded'
+  | 'absent';
 export type QueueStatus = 'waiting' | 'calling' | 'staged' | 'loaded' | 'cancelled';
 
 export interface Family {
@@ -66,17 +72,15 @@ export type RealtimeMessage =
   | { type: 'QUEUE_UPDATED'; data: QueueItem }
   | { type: 'QUEUE_REMOVED'; data: { id: string } }
   | { type: 'SYNC'; data: QueueItem[] }
-  | { type: 'ROSTER_SYNCED'; data: { studentsSynced: number; groupsSynced: number } };
+  | { type: 'ROSTER_SYNCED'; data: { studentsSynced: number; groupsSynced: number } }
+  | { type: 'STUDENT_CHECKED_IN'; data: { id: string; tag_number: string; first_name: string; last_name: string; grade_room: string; status: StudentStatus } }
+  | { type: 'SESSION_RESET'; data: { session_date: string } };
 
 export interface RosterImportRow {
   tag_number: string;
   family_name: string;
   student_first_name: string;
-  student_last_name: string;
   grade_room: string;
-  phone?: string;
-  notes?: string;
-  authorized_pickups?: string;
 }
 
 export interface UpsertTagPayload {

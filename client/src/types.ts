@@ -1,14 +1,28 @@
-export type StudentStatus = 'in_class' | 'staged' | 'loaded' | 'absent';
+export type StudentStatus =
+  | 'not_checked_in'
+  | 'in_class'
+  | 'pickup_arrived'
+  | 'released_from_class'
+  | 'loaded'
+  | 'absent';
 export type QueueStatus = 'waiting' | 'calling' | 'staged' | 'loaded' | 'cancelled';
-/** Staff roles (Beeline-aligned). Driver is optional public access — no sign-in. */
-export type StaffRole = 'dispatcher' | 'teacher' | 'trafficcontroller';
-export type AppRole = StaffRole | 'driver';
+/** Staff roles (Beeline-aligned). */
+export type StaffRole = 'admin' | 'hallmonitor' | 'trafficcontroller';
+export type AppRole = StaffRole;
 
 export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
-  dispatcher: 'Dispatcher',
-  teacher: 'Teacher',
+  admin: 'Admin',
+  hallmonitor: 'Hall Monitor',
   trafficcontroller: 'Traffic Controller',
 };
+
+/** Placard tags: 1–5 digits */
+export const TAG_NUMBER_MAX_LENGTH = 5;
+
+export function sanitizeTagNumberInput(raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, TAG_NUMBER_MAX_LENGTH);
+}
+
 export type ArrivalSource = 'geofence' | 'beacon' | 'manual' | 'volunteer';
 
 export interface PickupZone {
@@ -72,7 +86,9 @@ export type RealtimeMessage =
   | { type: 'QUEUE_UPDATED'; data: QueueItem }
   | { type: 'QUEUE_REMOVED'; data: { id: string } }
   | { type: 'SYNC'; data: QueueItem[] }
-  | { type: 'ROSTER_SYNCED'; data: { studentsSynced: number; groupsSynced: number } };
+  | { type: 'ROSTER_SYNCED'; data: { studentsSynced: number; groupsSynced: number } }
+  | { type: 'STUDENT_CHECKED_IN'; data: RosterStudent }
+  | { type: 'SESSION_RESET'; data: { session_date: string } };
 
 export interface RosterStudent extends Student {
   tag_number: string;

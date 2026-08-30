@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { db } from './lib/db';
 import { publish, negotiate } from './lib/pubsub';
-import { parseCsv } from './lib/csvParser';
+import { parseCsv, lastNameFromFamily } from './lib/csvParser';
 import { subscribe, mockStore } from './lib/mockStore';
 import { isMockMode } from './lib/types';
 
@@ -45,15 +45,22 @@ app.post('/api/queue', async (req, res) => {
 app.patch('/api/queue/:id', async (req, res) => {
   try {
     let item;
+    let removed = false;
     if (req.body.student_id) {
-      item = await db.stageStudent(req.body.student_id);
+      if (req.body.action === 'load') {
+        item = await db.loadStudent(req.body.student_id);
+        removed = !!item && item.status === 'loaded';
+      } else {
+        item = await db.stageStudent(req.body.student_id);
+      }
       if (!item) return res.status(404).json({ error: 'Not found' });
     } else if (req.body.status) {
       item = await db.updateQueueStatus(req.params.id, req.body.status);
+      removed = req.body.status === 'loaded';
     } else {
       return res.status(400).json({ error: 'status or student_id required' });
     }
-    if (req.body.status === 'loaded') {
+    if (removed) {
       await publish({ type: 'QUEUE_REMOVED', data: { id: item.id } });
     } else {
       await publish({ type: 'QUEUE_UPDATED', data: item });
@@ -87,6 +94,76 @@ app.get('/api/roster', async (_req, res) => {
     res.json(await db.getRoster());
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+app.get('/api/roster/export', async (req, res) => {
+  try {
+    const format = String(req.query.format ?? 'csv').toLowerCase();
+    const roster = await db.getRoster();
+    const rows = roster.students.map((s: any) => ({
+      StudentID: s.tag_number ?? '',
+      FirstName: s.first_name ?? '',
+      LastName: s.last_name ?? '',
+      Grade: s.grade_room ?? '',
+      Family: s.family_name ?? '',
+      Status: s.status ?? '',
+    }));
+
+    if (format === 'xlsx') {
+      const xlsx = await import('xlsx');
+      const ws = xlsx.utils.json_to_sheet(rows);
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, 'Attendance');
+      const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.xlsx"`);
+      res.send(buf);
+      return;
+    }
+
+    const keys = rows.length > 0 ? Object.keys(rows[0]) : ['StudentID', 'FirstName', 'LastName', 'Grade', 'Family', 'Status'];
+    const escapeVal = (v: any) => {
+      if (v == null) return '';
+      const s = String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const lines = [keys.join(',')];
+    for (const r of rows) lines.push(keys.map((k) => escapeVal((r as any)[k])).join(','));
+    const csv = lines.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(Buffer.from(csv, 'utf-8'));
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+app.post('/api/students/morning-check-in', async (req, res) => {
+  try {
+    let student;
+    if (req.body.student_id) {
+      student = await db.morningCheckInStudent(req.body.student_id);
+    } else if (req.body.tag_number) {
+      student = await db.morningCheckIn(String(req.body.tag_number).trim());
+    } else {
+      return res.status(400).json({ error: 'tag_number or student_id required' });
+    }
+    await publish({ type: 'STUDENT_CHECKED_IN', data: student });
+    res.json(student);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+app.post('/api/admin/restart-session', async (req, res) => {
+  try {
+    const result = await db.restartSession(String(req.body.password ?? ''));
+    await publish({ type: 'SESSION_RESET', data: { session_date: result.session_date } });
+    await publish({ type: 'SYNC', data: await db.getQueue() });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
   }
 });
 
@@ -203,7 +280,7 @@ app.post('/api/queue/arrive', async (req, res) => {
 });
 
 app.get('/api/GetRoles', (_req, res) => {
-  res.json({ roles: ['dispatcher'] });
+  res.json({ roles: ['admin'] });
 });
 
 app.get('/api/events', (req, res) => {

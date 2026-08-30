@@ -52,22 +52,31 @@ app.http('queuePatch', {
     }
     try {
       const id = req.params.id;
-      const body = (await req.json()) as { status?: string; student_id?: string };
+      const body = (await req.json()) as { status?: string; student_id?: string; action?: string };
 
       let item;
+      let removed = false;
       if (body.student_id) {
-        item = await db.stageStudent(body.student_id);
-        if (!item) {
-          return { status: 404, jsonBody: { error: 'Queue entry not found' }, headers: corsHeaders() };
+        if (body.action === 'load') {
+          item = await db.loadStudent(body.student_id);
+          if (!item) {
+            return { status: 404, jsonBody: { error: 'Queue entry not found' }, headers: corsHeaders() };
+          }
+          removed = item.status === 'loaded';
+        } else {
+          item = await db.stageStudent(body.student_id);
+          if (!item) {
+            return { status: 404, jsonBody: { error: 'Queue entry not found' }, headers: corsHeaders() };
+          }
         }
       } else if (body.status) {
         item = await db.updateQueueStatus(id, body.status as 'waiting' | 'staged' | 'loaded' | 'cancelled');
+        removed = body.status === 'loaded';
       } else {
         return { status: 400, jsonBody: { error: 'status or student_id required' }, headers: corsHeaders() };
       }
 
-      const msgType = body.status === 'loaded' ? 'QUEUE_REMOVED' : 'QUEUE_UPDATED';
-      if (msgType === 'QUEUE_REMOVED') {
+      if (removed) {
         await publish({ type: 'QUEUE_REMOVED', data: { id: item.id } });
       } else {
         await publish({ type: 'QUEUE_UPDATED', data: item });
@@ -128,6 +137,105 @@ app.http('rosterGet', {
       return { status: 200, jsonBody: roster, headers: corsHeaders() };
     } catch (err) {
       return { status: 500, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
+    }
+  },
+});
+
+app.http('rosterExport', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'roster/export',
+  handler: async (req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    try {
+      const format = (req.query.get('format') ?? 'csv').toLowerCase();
+      const roster = await db.getRoster();
+      const rows = roster.students.map((s: any) => ({
+        StudentID: s.tag_number ?? '',
+        FirstName: s.first_name ?? '',
+        LastName: s.last_name ?? '',
+        Grade: s.grade_room ?? '',
+        Family: s.family_name ?? '',
+        Status: s.status ?? '',
+      }));
+
+      if (format === 'xlsx') {
+        const xlsx = await import('xlsx');
+        const ws = xlsx.utils.json_to_sheet(rows);
+        const wb = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(wb, ws, 'Attendance');
+        const buf = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        return {
+          status: 200,
+          body: buf,
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.xlsx"`,
+            'Access-Control-Allow-Origin': '*',
+          },
+        };
+      }
+
+      // default: csv
+      const keys = rows.length > 0 ? Object.keys(rows[0]) : ['StudentID', 'FirstName', 'LastName', 'Grade', 'Family', 'Status'];
+      const escape = (v: any) => {
+        if (v == null) return '';
+        const s = String(v);
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const lines = [keys.join(',')];
+      for (const r of rows) lines.push(keys.map((k) => escape((r as any)[k])).join(','));
+      const csv = lines.join('\n');
+      const buf = Buffer.from(csv, 'utf-8');
+      return { status: 200, body: buf, headers: { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="attendance-${new Date().toISOString().slice(0,10)}.csv"`, 'Access-Control-Allow-Origin': '*' } };
+    } catch (err) {
+      return { status: 500, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
+    }
+  },
+});
+
+app.http('studentsMorningCheckIn', {
+  methods: ['POST', 'OPTIONS'],
+  authLevel: 'anonymous',
+  route: 'students/morning-check-in',
+  handler: async (req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    if (req.method === 'OPTIONS') {
+      return { status: 204, headers: corsHeaders() };
+    }
+    try {
+      const body = (await req.json()) as { tag_number?: string; student_id?: string };
+      let student;
+      if (body.student_id) {
+        student = await db.morningCheckInStudent(body.student_id);
+      } else if (body.tag_number) {
+        student = await db.morningCheckIn(String(body.tag_number).trim());
+      } else {
+        return { status: 400, jsonBody: { error: 'tag_number or student_id required' }, headers: corsHeaders() };
+      }
+      await publish({ type: 'STUDENT_CHECKED_IN', data: student });
+      return { status: 200, jsonBody: student, headers: corsHeaders() };
+    } catch (err) {
+      return { status: 400, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
+    }
+  },
+});
+
+app.http('adminRestartSession', {
+  methods: ['POST', 'OPTIONS'],
+  authLevel: 'anonymous',
+  route: 'admin/restart-session',
+  handler: async (req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    if (req.method === 'OPTIONS') {
+      return { status: 204, headers: corsHeaders() };
+    }
+    try {
+      const body = (await req.json()) as { password?: string };
+      const password = String(body.password ?? '');
+      const result = await db.restartSession(password);
+      await publish({ type: 'SESSION_RESET', data: { session_date: result.session_date } });
+      await publish({ type: 'SYNC', data: await db.getQueue() });
+      return { status: 200, jsonBody: result, headers: corsHeaders() };
+    } catch (err) {
+      return { status: 400, jsonBody: { error: (err as Error).message }, headers: corsHeaders() };
     }
   },
 });

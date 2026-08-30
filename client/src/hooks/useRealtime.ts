@@ -30,6 +30,9 @@ export function useRealtime() {
         break;
       case 'ROSTER_SYNCED':
         break;
+      case 'SESSION_RESET':
+        refresh();
+        break;
     }
   }, []);
 

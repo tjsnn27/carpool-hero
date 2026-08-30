@@ -129,7 +129,7 @@ SWA GitHub Action or `swa deploy` with:
 - Upserts student records with `m365_user_id`, `m365_group_id`, and `grade_room`
 
 ### Placard Tag Mapping (Dispatcher)
-- **`/admin-tags`** — map 2–4 digit placard numbers to M365 student records (siblings)
+- **`/admin-tags`** — map 1–5 digit placard numbers to student records (siblings)
 - Set authorized pickup names and safety/allergy notes per family
 
 ### Azure App Registration Requirements
@@ -172,7 +172,9 @@ MOCK_MODE=false
 ## CSV Format
 
 ```csv
-TagNumber,FamilyName,StudentFirstName,StudentLastName,GradeRoom,Phone,Notes
-104,Smith Family,Emma,Smith,K-1,555-0104,
-205,Johnson Family,Liam,Johnson,3rd-4th,555-0205,Custody: mother only pickup
+TagNumber,StudentFirstName,FamilyName,GradeRoom
+104,Emma,Smith Family,K-1
+205,Liam,Johnson Family,3rd-4th
 ```
+
+Tab-separated files with the same four columns are also accepted. Last name is derived from the family name (e.g. Smith Family → Smith). Phone, notes, and authorized pickups are configured separately under **Tags**.

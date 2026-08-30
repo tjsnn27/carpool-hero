@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CloudDownload, Search, Upload, Users } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../auth/AuthProvider';
 import type { RosterData, RosterStudent } from '../types';
+import { studentStatusLabel } from '../lib/statusLabels';
 
 export default function AdminRosterPage() {
+  const { refreshRosterGrades } = useAuth();
   const [roster, setRoster] = useState<RosterData | null>(null);
   const [search, setSearch] = useState('');
   const [csvText, setCsvText] = useState('');
@@ -52,6 +55,7 @@ export default function AdminRosterPage() {
       const r = await api.importCsv(csv);
       setResult(`Imported ${r.rowsProcessed} rows — ${r.familiesCreated} families, ${r.studentsCreated} new students, ${r.studentsUpdated} updated.`);
       await load();
+      await refreshRosterGrades();
     } catch (err) {
       setResult(err instanceof Error ? err.message : 'Import failed');
     } finally {
@@ -59,9 +63,10 @@ export default function AdminRosterPage() {
     }
   };
 
-  const sample = `TagNumber,FamilyName,StudentFirstName,StudentLastName,GradeRoom,Phone,Notes
-104,Smith Family,Emma,Smith,K-1,555-0104,
-205,Johnson Family,Liam,Johnson,3rd-4th,555-0205,Custody: mother only pickup`;
+  const sample = `StudentID,StudentFirstName,FamilyName,GradeRoom
+10049,Madhumitha,J,Grade 2(Tamil)
+10035,Jishna,A,Grade 1(Tamil)
+10055,Yugan,A,Pre-KG (Tamil)`;
 
   return (
     <div className="space-y-6 pb-8">
@@ -86,7 +91,7 @@ export default function AdminRosterPage() {
       <div className="bg-white rounded-2xl border-4 border-stone-900 p-5 shadow-[3px_3px_0_#1c1917]">
         <h2 className="font-black text-lg mb-3 flex items-center gap-2"><Upload size={20} /> CSV Import</h2>
         <p className="text-sm text-stone-600 mb-3 font-medium">
-          Columns: TagNumber, FamilyName, StudentFirstName, StudentLastName, GradeRoom, Phone, Notes
+          Required columns only: StudentID, StudentFirstName, FamilyName, GradeRoom (comma or tab separated)
         </p>
         <div
           className="border-3 border-dashed border-stone-400 rounded-xl p-8 text-center cursor-pointer hover:border-brand-600 mb-3"
@@ -120,7 +125,7 @@ export default function AdminRosterPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, family, tag, grade…"
+          placeholder="Search name, family, Student ID, grade…"
           className="w-full pl-10 pr-4 py-3 border-3 border-stone-900 rounded-xl font-bold bg-white"
         />
       </div>
@@ -129,7 +134,7 @@ export default function AdminRosterPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-brand-100 border-b-2 border-stone-900 text-left">
-              <th className="p-3 font-black">Tag</th>
+              <th className="p-3 font-black">Student ID</th>
               <th className="p-3 font-black">Student</th>
               <th className="p-3 font-black">Family</th>
               <th className="p-3 font-black">Grade</th>
@@ -144,7 +149,7 @@ export default function AdminRosterPage() {
                 <td className="p-3">{s.family_name}</td>
                 <td className="p-3 font-bold">{s.grade_room}</td>
                 <td className="p-3">
-                  <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-stone-100">{s.status.replace('_', ' ')}</span>
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-stone-100">{studentStatusLabel(s.status)}</span>
                 </td>
               </tr>
             ))}

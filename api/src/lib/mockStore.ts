@@ -15,6 +15,10 @@ import type {
   UpsertTagPayload,
 } from './types';
 import { today } from './types';
+import { lastNameFromFamily, parseCsv } from './csvParser';
+import { normalizePickupLocation } from './pickupLocations';
+import { assertValidTagNumber } from './tagNumber';
+import { STARTUP_ROSTER_CSV } from './startupRoster';
 
 const bus = new EventEmitter();
 bus.setMaxListeners(100);
@@ -29,6 +33,38 @@ let pickupZone: PickupZone = {
   radius_meters: 100,
 };
 
+let lastSessionDate = '';
+
+function isSunday(dateStr: string): boolean {
+  return new Date(`${dateStr}T12:00:00`).getDay() === 0;
+}
+
+function resetSessionStatuses() {
+  students.forEach((s) => {
+    if (s.status !== 'absent') s.status = 'not_checked_in';
+  });
+  queue = [];
+}
+
+function ensureDailySession() {
+  const sessionDate = today();
+  if (lastSessionDate === sessionDate) return;
+  if (isSunday(sessionDate)) {
+    resetSessionStatuses();
+  }
+  queue = queue.filter((q) => q.session_date === sessionDate);
+  lastSessionDate = sessionDate;
+}
+
+function rosterStudentRow(s: Student) {
+  const f = s.family_id ? families.find((fam) => fam.id === s.family_id) : null;
+  return {
+    ...s,
+    tag_number: f?.tag_number ?? '',
+    family_name: f?.family_name ?? '(unassigned)',
+  };
+}
+
 function makeStudent(
   partial: Pick<Student, 'first_name' | 'last_name' | 'grade_room'> &
     Partial<Omit<Student, 'first_name' | 'last_name' | 'grade_room'>>
@@ -42,50 +78,75 @@ function makeStudent(
     first_name: partial.first_name,
     last_name: partial.last_name,
     grade_room: partial.grade_room,
-    status: partial.status ?? 'in_class',
+    status: partial.status ?? 'not_checked_in',
   };
+}
+
+function applyRosterRows(rows: RosterImportRow[]): {
+  familiesCreated: number;
+  studentsCreated: number;
+  studentsUpdated: number;
+} {
+  let familiesCreated = 0;
+  let studentsCreated = 0;
+  let studentsUpdated = 0;
+
+  for (const row of rows) {
+    let tag: string;
+    try {
+      tag = assertValidTagNumber(row.tag_number);
+    } catch {
+      continue;
+    }
+    if (!row.family_name || !row.student_first_name || !row.grade_room) continue;
+
+    let family = families.find((f) => f.tag_number === tag);
+    if (!family) {
+      family = {
+        id: randomUUID(),
+        tag_number: tag,
+        family_name: row.family_name.trim(),
+        primary_phone: null,
+        authorized_pickups: [],
+        safety_notes: '',
+      };
+      families.push(family);
+      familiesCreated++;
+    } else {
+      family.family_name = row.family_name.trim();
+    }
+
+    const lastName = lastNameFromFamily(row.family_name);
+    const student = students.find(
+      (s) =>
+        s.family_id === family!.id &&
+        s.first_name === row.student_first_name.trim() &&
+        s.last_name === lastName
+    );
+
+    if (student) {
+      student.grade_room = row.grade_room.trim();
+      studentsUpdated++;
+    } else {
+      students.push(
+        makeStudent({
+          family_id: family.id,
+          first_name: row.student_first_name.trim(),
+          last_name: lastName,
+          grade_room: row.grade_room.trim(),
+        })
+      );
+      studentsCreated++;
+    }
+  }
+
+  return { familiesCreated, studentsCreated, studentsUpdated };
 }
 
 function seedIfEmpty() {
   if (students.length > 0) return;
-
-  const smithId = randomUUID();
-  const johnsonId = randomUUID();
-  const williamsId = randomUUID();
-
-  families = [
-    {
-      id: smithId,
-      tag_number: '104',
-      family_name: 'Smith Family',
-      primary_phone: '555-0104',
-      authorized_pickups: ['John Smith', 'Jane Smith'],
-      safety_notes: '',
-    },
-    {
-      id: johnsonId,
-      tag_number: '205',
-      family_name: 'Johnson Family',
-      primary_phone: '555-0205',
-      authorized_pickups: ['Mike Johnson'],
-      safety_notes: 'Custody: mother only pickup',
-    },
-    {
-      id: williamsId,
-      tag_number: '312',
-      family_name: 'Williams Family',
-      primary_phone: '555-0312',
-      authorized_pickups: ['Chris Williams'],
-      safety_notes: 'Allergy: peanuts',
-    },
-  ];
-
-  students = [
-    makeStudent({ family_id: smithId, m365_user_id: 'm365-emma', m365_group_id: 'mock-group-k1', first_name: 'Emma', last_name: 'Smith', grade_room: 'K-1' }),
-    makeStudent({ family_id: smithId, m365_user_id: 'm365-olivia', m365_group_id: 'mock-group-k1', first_name: 'Olivia', last_name: 'Brown', grade_room: 'K-1' }),
-    makeStudent({ family_id: johnsonId, m365_user_id: 'm365-liam', m365_group_id: 'mock-group-34', first_name: 'Liam', last_name: 'Johnson', grade_room: '3rd-4th' }),
-    makeStudent({ family_id: williamsId, m365_user_id: 'm365-sophia', m365_group_id: 'mock-group-k1', first_name: 'Sophia', last_name: 'Williams', grade_room: 'K-1' }),
-  ];
+  applyRosterRows(parseCsv(STARTUP_ROSTER_CSV));
+  lastSessionDate = today();
 }
 
 export function subscribe(listener: (msg: RealtimeMessage) => void): () => void {
@@ -119,10 +180,12 @@ function buildQueueItem(family: Family, laneNumber: number): QueueItem {
 export const mockStore = {
   init() {
     seedIfEmpty();
+    ensureDailySession();
   },
 
   getQueue(sessionDate = today()): QueueItem[] {
     seedIfEmpty();
+    ensureDailySession();
     return queue
       .filter((q) => q.session_date === sessionDate && q.status !== 'cancelled' && q.status !== 'loaded')
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -135,16 +198,10 @@ export const mockStore = {
 
   getRoster() {
     seedIfEmpty();
+    ensureDailySession();
     return {
       families: [...families],
-      students: students.map((s) => {
-        const f = s.family_id ? families.find((fam) => fam.id === s.family_id) : null;
-        return {
-          ...s,
-          tag_number: f?.tag_number ?? '',
-          family_name: f?.family_name ?? '(unassigned)',
-        };
-      }),
+      students: students.map((s) => rosterStudentRow(s)),
     };
   },
 
@@ -163,6 +220,7 @@ export const mockStore = {
 
   upsertTag(payload: UpsertTagPayload): TagRecord {
     seedIfEmpty();
+    payload = { ...payload, tag_number: assertValidTagNumber(payload.tag_number) };
     let family = families.find((f) => f.tag_number === payload.tag_number);
     if (!family) {
       family = {
@@ -232,9 +290,11 @@ export const mockStore = {
   },
 
   checkIn(tagNumber: string, laneNumber = 1): QueueItem {
+    tagNumber = assertValidTagNumber(tagNumber);
+    laneNumber = normalizePickupLocation(laneNumber);
     seedIfEmpty();
     const family = families.find((f) => f.tag_number === tagNumber);
-    if (!family) throw new Error(`No family found for tag #${tagNumber}`);
+    if (!family) throw new Error(`No family found for Student ID ${tagNumber}`);
 
     const sessionDate = today();
     const existing = queue.find(
@@ -244,12 +304,33 @@ export const mockStore = {
         q.status !== 'loaded' &&
         q.status !== 'cancelled'
     );
-    if (existing) return existing;
+    if (existing) {
+      const notReady = students.find(
+        (s) => s.family_id === family.id && s.status === 'not_checked_in'
+      );
+      if (notReady) {
+        throw new Error(`${notReady.first_name} must complete morning check-in first`);
+      }
+      students
+        .filter((s) => s.family_id === family.id && s.status === 'in_class')
+        .forEach((s) => {
+          s.status = 'pickup_arrived';
+        });
+      existing.students = students.filter((s) => s.family_id === family.id).map((s) => ({ ...s }));
+      return existing;
+    }
+
+    const notReady = students.find(
+      (s) => s.family_id === family.id && s.status === 'not_checked_in'
+    );
+    if (notReady) {
+      throw new Error(`${notReady.first_name} must complete morning check-in first`);
+    }
 
     students
       .filter((s) => s.family_id === family.id && s.status === 'in_class')
       .forEach((s) => {
-        s.status = 'staged';
+        s.status = 'pickup_arrived';
       });
 
     const item = buildQueueItem(family, laneNumber);
@@ -268,7 +349,8 @@ export const mockStore = {
     students
       .filter((s) => s.family_id === last.family_id)
       .forEach((s) => {
-        if (s.status === 'staged') s.status = 'in_class';
+        if (s.status === 'pickup_arrived') s.status = 'in_class';
+        if (s.status === 'released_from_class') s.status = 'pickup_arrived';
       });
     return last;
   },
@@ -281,13 +363,6 @@ export const mockStore = {
     item.status = status;
     if (status === 'loaded') item.dismissed_at = new Date().toISOString();
 
-    if (status === 'staged' || status === 'calling') {
-      students
-        .filter((s) => s.family_id === item.family_id)
-        .forEach((s) => {
-          if (s.status !== 'loaded') s.status = 'staged';
-        });
-    }
     if (status === 'loaded') {
       students
         .filter((s) => s.family_id === item.family_id)
@@ -304,7 +379,16 @@ export const mockStore = {
     seedIfEmpty();
     const student = students.find((s) => s.id === studentId);
     if (!student) throw new Error('Student not found');
-    student.status = 'staged';
+    if (student.status !== 'pickup_arrived') {
+      throw new Error(
+        student.status === 'not_checked_in'
+          ? 'Student must be checked in and have pickup arrived before release'
+          : student.status === 'in_class'
+            ? 'Pickup must arrive before release from class'
+            : 'Student is not ready to be released from class'
+      );
+    }
+    student.status = 'released_from_class';
 
     const item = queue.find(
       (q) => q.family_id === student.family_id && q.status !== 'loaded' && q.status !== 'cancelled'
@@ -316,61 +400,82 @@ export const mockStore = {
     return item ?? null;
   },
 
-  importRoster(rows: RosterImportRow[]) {
+  loadStudent(studentId: string): QueueItem | null {
     seedIfEmpty();
-    let familiesCreated = 0;
-    let studentsCreated = 0;
-    let studentsUpdated = 0;
+    const student = students.find((s) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    if (student.status !== 'released_from_class') {
+      throw new Error('Student must be released from class before loading');
+    }
+    student.status = 'loaded';
 
-    for (const row of rows) {
-      const tag = row.tag_number.trim();
-      if (!tag || !row.family_name || !row.student_first_name || !row.grade_room) continue;
+    const item = queue.find(
+      (q) => q.family_id === student.family_id && q.status !== 'loaded' && q.status !== 'cancelled'
+    );
+    if (!item) return null;
 
-      let family = families.find((f) => f.tag_number === tag);
-      if (!family) {
-        family = {
-          id: randomUUID(),
-          tag_number: tag,
-          family_name: row.family_name.trim(),
-          primary_phone: row.phone?.trim() || null,
-          authorized_pickups: row.authorized_pickups
-            ? row.authorized_pickups.split(';').map((s) => s.trim()).filter(Boolean)
-            : [],
-          safety_notes: row.notes?.trim() || '',
-        };
-        families.push(family);
-        familiesCreated++;
-      } else {
-        family.family_name = row.family_name.trim();
-        if (row.phone) family.primary_phone = row.phone.trim();
-        if (row.notes) family.safety_notes = row.notes.trim();
-      }
+    const familyStudents = students.filter((s) => s.family_id === item.family_id);
+    item.students = familyStudents.map((s) => ({ ...s }));
 
-      const lastName = row.student_last_name?.trim() || row.family_name.split(/\s+/)[0];
-      const student = students.find(
-        (s) =>
-          s.family_id === family!.id &&
-          s.first_name === row.student_first_name.trim() &&
-          s.last_name === lastName
-      );
+    const activeStudents = familyStudents.filter((s) => s.status !== 'absent');
+    if (activeStudents.length > 0 && activeStudents.every((s) => s.status === 'loaded')) {
+      item.status = 'loaded';
+      item.dismissed_at = new Date().toISOString();
+    }
+    return item;
+  },
 
-      if (student) {
-        student.grade_room = row.grade_room.trim();
-        studentsUpdated++;
-      } else {
-        students.push(
-          makeStudent({
-            family_id: family.id,
-            first_name: row.student_first_name.trim(),
-            last_name: lastName,
-            grade_room: row.grade_room.trim(),
-          })
-        );
-        studentsCreated++;
-      }
+  morningCheckIn(tagNumber: string) {
+    seedIfEmpty();
+    ensureDailySession();
+    tagNumber = assertValidTagNumber(tagNumber);
+    const family = families.find((f) => f.tag_number === tagNumber);
+    if (!family) throw new Error(`No student found for Student ID ${tagNumber}`);
+
+    const student = students.find((s) => s.family_id === family.id);
+    if (!student) throw new Error(`No student found for Student ID ${tagNumber}`);
+
+    if (student.status === 'in_class') {
+      throw new Error(`${student.first_name} is already checked in`);
+    }
+    if (student.status !== 'not_checked_in') {
+      throw new Error(`${student.first_name} cannot be checked in right now`);
     }
 
-    return { familiesCreated, studentsCreated, studentsUpdated, rowsProcessed: rows.length };
+    student.status = 'in_class';
+    return rosterStudentRow(student);
+  },
+
+  morningCheckInStudent(studentId: string) {
+    seedIfEmpty();
+    ensureDailySession();
+    const student = students.find((s) => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    const f = student.family_id ? families.find((fam) => fam.id === student.family_id) : null;
+    if (!f?.tag_number) throw new Error('Student has no Student ID assigned');
+
+    if (student.status === 'in_class') {
+      throw new Error(`${student.first_name} is already checked in`);
+    }
+    if (student.status !== 'not_checked_in') {
+      throw new Error(`${student.first_name} cannot be checked in right now`);
+    }
+
+    student.status = 'in_class';
+    return rosterStudentRow(student);
+  },
+
+  restartSession(_password: string) {
+    seedIfEmpty();
+    resetSessionStatuses();
+    lastSessionDate = today();
+    return { session_date: lastSessionDate, studentsReset: students.filter((s) => s.status !== 'absent').length };
+  },
+
+  importRoster(rows: RosterImportRow[]) {
+    seedIfEmpty();
+    const result = applyRosterRows(rows);
+    return { ...result, rowsProcessed: rows.length };
   },
 
   getPickupZone(): PickupZone {
@@ -385,7 +490,7 @@ export const mockStore = {
   getFamilyPickupStatus(tagNumber: string): FamilyPickupStatus {
     seedIfEmpty();
     const family = families.find((f) => f.tag_number === tagNumber);
-    if (!family) throw new Error(`No family found for tag #${tagNumber}`);
+    if (!family) throw new Error(`No family found for Student ID ${tagNumber}`);
 
     const sessionDate = today();
     const active = queue.find(

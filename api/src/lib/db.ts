@@ -3,6 +3,10 @@ import type { QueueItem, QueueStatus, RosterImportRow, Student, TagRecord, Upser
 import { isMockMode, today } from './types';
 import { mockStore } from './mockStore';
 import { fetchClassGroups } from './graph';
+import { lastNameFromFamily } from './csvParser';
+import { normalizePickupLocation } from './pickupLocations';
+import { assertValidTagNumber } from './tagNumber';
+import { assertAdminPassword } from './adminAuth';
 
 let pool: Pool | null = null;
 
@@ -59,13 +63,15 @@ export const db = {
   },
 
   async checkIn(tagNumber: string, laneNumber = 1): Promise<QueueItem> {
+    tagNumber = assertValidTagNumber(tagNumber);
+    laneNumber = normalizePickupLocation(laneNumber);
     if (isMockMode()) return mockStore.checkIn(tagNumber, laneNumber);
 
     const client = await getPool().connect();
     try {
       await client.query('BEGIN');
       const familyResult = await client.query('SELECT * FROM families WHERE tag_number = $1', [tagNumber]);
-      if (familyResult.rows.length === 0) throw new Error(`No family found for tag #${tagNumber}`);
+      if (familyResult.rows.length === 0) throw new Error(`No family found for Student ID ${tagNumber}`);
       const family = familyResult.rows[0];
       const sessionDate = today();
 
@@ -75,9 +81,29 @@ export const db = {
         [tagNumber, sessionDate]
       );
       if (existing.rows.length > 0) {
+        const notReady = await client.query(
+          `SELECT first_name FROM students WHERE family_id = $1 AND status = 'not_checked_in' LIMIT 1`,
+          [family.id]
+        );
+        if (notReady.rows.length > 0) {
+          throw new Error(`${notReady.rows[0].first_name} must complete morning check-in first`);
+        }
+        await client.query(
+          `UPDATE students SET status = 'pickup_arrived'
+           WHERE family_id = $1 AND status = 'in_class'`,
+          [family.id]
+        );
         await client.query('COMMIT');
         const studentsResult = await getPool().query('SELECT * FROM students WHERE family_id = $1', [family.id]);
         return mapQueueRow({ ...existing.rows[0], ...family }, studentsResult.rows);
+      }
+
+      const notReady = await client.query(
+        `SELECT first_name FROM students WHERE family_id = $1 AND status = 'not_checked_in' LIMIT 1`,
+        [family.id]
+      );
+      if (notReady.rows.length > 0) {
+        throw new Error(`${notReady.rows[0].first_name} must complete morning check-in first`);
       }
 
       const insertResult = await client.query(
@@ -87,7 +113,8 @@ export const db = {
       );
 
       await client.query(
-        `UPDATE students SET status = 'staged' WHERE family_id = $1 AND status = 'in_class'`,
+        `UPDATE students SET status = 'pickup_arrived'
+         WHERE family_id = $1 AND status = 'in_class'`,
         [family.id]
       );
       await client.query('COMMIT');
@@ -116,12 +143,6 @@ export const db = {
       if (qResult.rows.length === 0) throw new Error('Queue entry not found');
       const entry = qResult.rows[0];
 
-      if (status === 'staged') {
-        await client.query(
-          `UPDATE students SET status = 'staged' WHERE family_id = $1 AND status != 'loaded'`,
-          [entry.family_id]
-        );
-      }
       if (status === 'loaded') {
         await client.query(`UPDATE students SET status = 'loaded' WHERE family_id = $1`, [entry.family_id]);
       }
@@ -141,10 +162,20 @@ export const db = {
   async stageStudent(studentId: string): Promise<QueueItem | null> {
     if (isMockMode()) return mockStore.stageStudent(studentId);
 
-    await getPool().query(`UPDATE students SET status = 'staged' WHERE id = $1`, [studentId]);
     const studentResult = await getPool().query('SELECT * FROM students WHERE id = $1', [studentId]);
     if (studentResult.rows.length === 0) throw new Error('Student not found');
     const student = studentResult.rows[0];
+    if (student.status !== 'pickup_arrived') {
+      throw new Error(
+        student.status === 'not_checked_in'
+          ? 'Student must be checked in and have pickup arrived before release'
+          : student.status === 'in_class'
+            ? 'Pickup must arrive before release from class'
+            : 'Student is not ready to be released from class'
+      );
+    }
+
+    await getPool().query(`UPDATE students SET status = 'released_from_class' WHERE id = $1`, [studentId]);
 
     await getPool().query(
       `UPDATE carpool_queue SET status = 'calling'
@@ -164,6 +195,57 @@ export const db = {
     return mapQueueRow(queueResult.rows[0], studentsResult.rows);
   },
 
+  async loadStudent(studentId: string): Promise<QueueItem | null> {
+    if (isMockMode()) return mockStore.loadStudent(studentId);
+
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      const studentResult = await client.query('SELECT * FROM students WHERE id = $1 FOR UPDATE', [studentId]);
+      if (studentResult.rows.length === 0) throw new Error('Student not found');
+      const student = studentResult.rows[0];
+      if (student.status !== 'released_from_class') {
+        throw new Error('Student must be released from class before loading');
+      }
+
+      await client.query(`UPDATE students SET status = 'loaded' WHERE id = $1`, [studentId]);
+
+      const queueResult = await client.query(
+        `SELECT q.*, f.family_name, f.primary_phone, f.authorized_pickups, f.safety_notes
+         FROM carpool_queue q JOIN families f ON f.id = q.family_id
+         WHERE q.family_id = $1 AND q.session_date = CURRENT_DATE
+           AND q.status NOT IN ('cancelled', 'loaded')
+         ORDER BY q.created_at DESC LIMIT 1`,
+        [student.family_id]
+      );
+      if (queueResult.rows.length === 0) {
+        await client.query('COMMIT');
+        return null;
+      }
+
+      const entry = queueResult.rows[0];
+      const studentsResult = await client.query('SELECT * FROM students WHERE family_id = $1', [student.family_id]);
+      const activeStudents = studentsResult.rows.filter((s) => s.status !== 'absent');
+      const allLoaded = activeStudents.length > 0 && activeStudents.every((s) => s.status === 'loaded');
+
+      if (allLoaded) {
+        await client.query(
+          `UPDATE carpool_queue SET status = 'loaded', dismissed_at = NOW() WHERE id = $1`,
+          [entry.id]
+        );
+        entry.status = 'loaded';
+      }
+
+      await client.query('COMMIT');
+      return mapQueueRow(entry, studentsResult.rows);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  },
+
   async undoLast(): Promise<QueueItem | null> {
     if (isMockMode()) return mockStore.undoLast();
     // Production undo: cancel most recent waiting entry for today
@@ -176,6 +258,78 @@ export const db = {
        ) RETURNING *`
     );
     return result.rows[0] ?? null;
+  },
+
+  async morningCheckIn(tagNumber: string) {
+    if (isMockMode()) return mockStore.morningCheckIn(tagNumber);
+
+    tagNumber = assertValidTagNumber(tagNumber);
+    const updated = await getPool().query(
+      `UPDATE students s SET status = 'in_class'
+       FROM families f
+       WHERE s.family_id = f.id AND f.tag_number = $1 AND s.status = 'not_checked_in'
+       RETURNING s.*, f.tag_number, f.family_name`,
+      [tagNumber]
+    );
+    if (updated.rows.length > 0) return updated.rows[0];
+
+    const existing = await getPool().query(
+      `SELECT s.status, s.first_name FROM students s
+       JOIN families f ON f.id = s.family_id
+       WHERE f.tag_number = $1`,
+      [tagNumber]
+    );
+    if (existing.rows.length === 0) throw new Error(`No student found for Student ID ${tagNumber}`);
+    const row = existing.rows[0];
+    if (row.status === 'in_class') throw new Error(`${row.first_name} is already checked in`);
+    throw new Error(`${row.first_name} cannot be checked in right now`);
+  },
+
+  async morningCheckInStudent(studentId: string) {
+    if (isMockMode()) return mockStore.morningCheckInStudent(studentId);
+
+    const updated = await getPool().query(
+      `UPDATE students SET status = 'in_class'
+       WHERE id = $1 AND status = 'not_checked_in'
+       RETURNING *`,
+      [studentId]
+    );
+    if (updated.rows.length > 0) {
+      const student = updated.rows[0];
+      const family = await getPool().query('SELECT tag_number, family_name FROM families WHERE id = $1', [student.family_id]);
+      return { ...student, tag_number: family.rows[0]?.tag_number ?? '', family_name: family.rows[0]?.family_name ?? '' };
+    }
+
+    const existing = await getPool().query('SELECT first_name, status FROM students WHERE id = $1', [studentId]);
+    if (existing.rows.length === 0) throw new Error('Student not found');
+    const row = existing.rows[0];
+    if (row.status === 'in_class') throw new Error(`${row.first_name} is already checked in`);
+    throw new Error(`${row.first_name} cannot be checked in right now`);
+  },
+
+  async restartSession(password: string) {
+    assertAdminPassword(password);
+    if (isMockMode()) return mockStore.restartSession(password);
+
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `UPDATE students SET status = 'not_checked_in' WHERE status NOT IN ('absent', 'not_checked_in')`
+      );
+      await client.query(
+        `UPDATE carpool_queue SET status = 'cancelled'
+         WHERE session_date = CURRENT_DATE AND status NOT IN ('cancelled', 'loaded')`
+      );
+      await client.query('COMMIT');
+      const countResult = await getPool().query(`SELECT COUNT(*)::int AS n FROM students WHERE status != 'absent'`);
+      return { session_date: today(), studentsReset: countResult.rows[0].n as number };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   },
 
   async getRoster() {
@@ -214,6 +368,7 @@ export const db = {
   },
 
   async upsertTag(payload: UpsertTagPayload): Promise<TagRecord> {
+    payload = { ...payload, tag_number: assertValidTagNumber(payload.tag_number) };
     if (isMockMode()) return mockStore.upsertTag(payload);
 
     const client = await getPool().connect();
@@ -312,26 +467,20 @@ export const db = {
     try {
       await client.query('BEGIN');
       for (const row of rows) {
-        const tag = row.tag_number.trim();
-        if (!tag || !row.family_name || !row.student_first_name || !row.grade_room) continue;
-
-        const pickups = row.authorized_pickups
-          ? row.authorized_pickups.split(';').map((s) => s.trim()).filter(Boolean)
-          : [];
+        const tag = assertValidTagNumber(row.tag_number);
+        if (!row.family_name || !row.student_first_name || !row.grade_room) continue;
 
         const familyResult = await client.query(
           `INSERT INTO families (tag_number, family_name, primary_phone, safety_notes, authorized_pickups)
-           VALUES ($1, $2, $3, $4, $5)
+           VALUES ($1, $2, NULL, '', '{}')
            ON CONFLICT (tag_number) DO UPDATE SET
-             family_name = EXCLUDED.family_name,
-             primary_phone = COALESCE(EXCLUDED.primary_phone, families.primary_phone),
-             safety_notes = COALESCE(EXCLUDED.safety_notes, families.safety_notes)
+             family_name = EXCLUDED.family_name
            RETURNING id, (xmax = 0) AS inserted`,
-          [tag, row.family_name.trim(), row.phone?.trim() || null, row.notes?.trim() || '', pickups]
+          [tag, row.family_name.trim()]
         );
         if (familyResult.rows[0].inserted) familiesCreated++;
         const familyId = familyResult.rows[0].id;
-        const lastName = row.student_last_name?.trim() || row.family_name.split(/\s+/)[0];
+        const lastName = lastNameFromFamily(row.family_name);
 
         const studentResult = await client.query(
           `INSERT INTO students (family_id, first_name, last_name, grade_room)
